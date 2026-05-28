@@ -162,6 +162,7 @@ let mostrarArquivados = false;
 let filtroMesSaldo = '';
 let filtroMesPedidos = '';
 let ocultarSaldoZerado = false;
+let ordemData = {pesquisa:'desc', resultado:'desc', saldo:'desc', pedidos:'desc'};
 let _editingItens = [];
 let _avulsoItens = [];
 let _rpPregao = null;
@@ -272,9 +273,14 @@ async function renderPesquisa() {
       <option value="">Todos UF</option>${UF_OPTS.map(u=>`<option${filtros.uf===u?' selected':''}>${u}</option>`).join('')}
     </select>
     <button class="btn ghost" onclick="toggleArquivados()" style="font-size:12px">${mostrarArquivados?'🗂 Ocultar arquivados':'🗂 Mostrar arquivados'} (${arquivados.length})</button>
+    <button class="btn ghost" onclick="toggleOrdem('pesquisa')" style="font-size:12px">${ordemData.pesquisa==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
   </div>`;
 
-  const lista = filtrar(ativos);
+  let lista = filtrar(ativos);
+  lista.sort((a,b) => {
+    const da = a.data||'', db = b.data||'';
+    return ordemData.pesquisa === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
+  });
   if (!lista.length) html += `<div class="empty" style="padding:24px">📭 Nenhum pregão em acompanhamento</div>`;
   lista.forEach(p => { html += cardPregao(p); });
 
@@ -284,8 +290,7 @@ async function renderPesquisa() {
     npFilt.forEach(p => {
       html += `<div class="card" style="opacity:.7">
         <div class="card-header">
-          <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
-          <span class="badge b-gray">Não participamos</span>${litBadge(p.licitante)}
+          <div class="card-title">${esc(p.cliente||'s/cliente')} — ${esc(p.pregao||'s/nº')}</div>
           <button class="btn sm" onclick="openEditPregao('${p.id}')">✏️ Editar</button>
         </div>
         <div class="card-meta"><span>📍 ${p.uf||'—'}</span><span>📅 ${p.data||'—'}</span>${p.motivo_nao?`<span>Motivo: ${esc(p.motivo_nao)}</span>`:''}</div>
@@ -298,7 +303,7 @@ async function renderPesquisa() {
     filtrar(arquivados).forEach(p => {
       html += `<div class="card" style="opacity:.6;border-style:dashed">
         <div class="card-header">
-          <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+          <div class="card-title">${esc(p.cliente||'s/cliente')} — ${esc(p.pregao||'s/nº')}</div>
           <span class="badge b-gray">📦 Arquivado</span>${litBadge(p.licitante)}
           <button class="btn sm" onclick="openEditPregao('${p.id}')">✏️ Editar</button>
         </div>
@@ -313,7 +318,7 @@ async function renderPesquisa() {
 function cardPregao(p) {
   return `<div class="card">
   <div class="card-header">
-    <div class="card-title">${esc(p.pregao||'Pregão s/nº')} — ${esc(p.uasg||'UASG ?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+    <div class="card-title">${esc(p.cliente||'s/cliente')} — ${esc(p.pregao||'s/nº')}</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       ${statusBadge(p.status)}${finBadge(p.financeiro)}${litBadge(p.licitante)}
       <button class="btn sm" onclick="openEditPregao('${p.id}')">✏️</button>
@@ -342,10 +347,15 @@ async function renderResultado() {
   if (companyFilter) q = q.eq('licitante', companyFilter);
   const { data } = await q;
   const busca = buscas.resultado.toLowerCase();
-  const lista = (data||[]).filter(p => !busca || JSON.stringify(p).toLowerCase().includes(busca));
+  let lista = (data||[]).filter(p => !busca || JSON.stringify(p).toLowerCase().includes(busca));
+  lista.sort((a,b) => {
+    const da = a.data||'', db = b.data||'';
+    return ordemData.resultado === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
+  });
 
   let html = `<div class="toolbar">
     <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.resultado)}" oninput="onBusca('resultado',this.value)">
+    <button class="btn ghost" onclick="toggleOrdem('resultado')" style="font-size:12px">${ordemData.resultado==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
     <button class="btn ghost" onclick="exportarResultados()" style="font-size:12px">📥 Exportar</button>
   </div>`;
   if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">🏆 Nenhum pregão encerrado</div>`; return; }
@@ -353,11 +363,13 @@ async function renderResultado() {
   lista.forEach(p => {
     const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
     const perdidos = (p.itens||[]).filter(i=>i.resultado==='perdido');
-    html += `<div class="card">
+    html += `<div class="card" style="${p.em_andamento?'border-color:#1d9e75;border-width:2px':''}">
     <div class="card-header">
-      <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+      <div class="card-title">${esc(p.cliente||'s/cliente')} — ${esc(p.pregao||'s/nº')}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${p.em_andamento?`<span class="badge-andamento">🟢 Em andamento</span>`:''}
         ${litBadge(p.licitante)}
+        <label class="toggle-andamento"><input type="checkbox" ${p.em_andamento?'checked':''} onchange="toggleAndamento('${p.id}',this.checked)"> Em andamento</label>
         ${ganhos.length?`<span class="badge b-green">${ganhos.length} ganho(s)</span>`:''}
         ${perdidos.length?`<span class="badge b-red">${perdidos.length} perdido(s)</span>`:''}
         <button class="btn sm" onclick="openItens('${p.id}')">📋 Itens</button>
@@ -390,7 +402,7 @@ function mesOpts(selected) {
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const now = new Date();
   let opts = `<option value="">Todos os meses</option>`;
-  for (let i = 11; i >= 0; i--) {
+  for (let i = 35; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const v = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const label = `${meses[d.getMonth()]} ${d.getFullYear()}`;
@@ -409,7 +421,10 @@ async function renderSaldo() {
 
   // filter by month (based on data do pregão)
   if (filtroMesSaldo) {
-    lista = lista.filter(p => p.data && p.data.startsWith(filtroMesSaldo));
+    lista = lista.filter(p => 
+      (p.data && p.data.startsWith(filtroMesSaldo)) ||
+      (p.validade_ata && p.validade_ata.startsWith(filtroMesSaldo))
+    );
   }
 
   // Ocultar contratos onde todos os itens ganhos têm saldo zerado
@@ -426,6 +441,11 @@ async function renderSaldo() {
       });
     });
   }
+
+  lista.sort((a,b) => {
+    const da = a.data||a.validade_ata||'', db = b.data||b.validade_ata||'';
+    return ordemData.saldo === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
+  });
 
   // totals
   let totalGanho = 0, totalSaldo = 0;
@@ -447,6 +467,7 @@ async function renderSaldo() {
     <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.saldo)}" oninput="onBusca('saldo',this.value)">
     <select onchange="filtroMesSaldo=this.value;renderTab()">${mesOpts(filtroMesSaldo)}</select>
     <button class="btn ghost" onclick="ocultarSaldoZerado=!ocultarSaldoZerado;renderTab()" style="font-size:12px">${ocultarSaldoZerado?'👁 Mostrar saldo zerado':'🚫 Ocultar saldo zerado'}</button>
+    <button class="btn ghost" onclick="toggleOrdem('saldo')" style="font-size:12px">${ordemData.saldo==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
     <button class="btn ghost" onclick="exportarSaldo()" style="font-size:12px">📥 Exportar</button>
   </div>`;
 
@@ -497,7 +518,7 @@ async function renderSaldo() {
 
     html += `<div class="card" style="${p.em_andamento?'border-color:#1d9e75;border-width:2px':''}">
     <div class="card-header">
-      <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+      <div class="card-title">${esc(p.cliente||'s/cliente')} — ${esc(p.pregao||'s/nº')}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${p.em_andamento?`<span class="badge-andamento">🟢 Em andamento</span>`:''}
         ${litBadge(p.licitante)}
@@ -535,12 +556,17 @@ async function renderPedidos() {
   if (filtroMesPedidos) {
     lista = lista.filter(r => r.data_reg && r.data_reg.startsWith(filtroMesPedidos));
   }
+  lista.sort((a,b) => {
+    const da = a.data_reg||'', db = b.data_reg||'';
+    return ordemData.pedidos === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
+  });
 
   const totalPedidos = lista.reduce((a,r) => a + Number(r.valor_total||0), 0);
 
   let html = `<div class="toolbar">
     <input type="text" placeholder="Buscar RP, cliente, pregão..." value="${esc(buscas.pedidos)}" oninput="onBusca('pedidos',this.value)">
     <select onchange="filtroMesPedidos=this.value;renderTab()">${mesOpts(filtroMesPedidos)}</select>
+    <button class="btn ghost" onclick="toggleOrdem('pedidos')" style="font-size:12px">${ordemData.pedidos==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
     <button class="btn ghost" onclick="exportarPedidos()" style="font-size:12px">📥 Exportar</button>
   </div>`;
 
@@ -676,7 +702,6 @@ async function deletePregao(id) {
 function openEncerrar(id) {
   showModal(`<h2>Encerrar pregão</h2>
   <p style="font-size:13px;color:var(--text2);margin-bottom:14px">O pregão irá para Resultados. Você adicionará os itens ganhos e perdidos a seguir.</p>
-  <div class="field"><label>Validade da ata / contrato</label><input type="date" id="f-validade"></div>
   <div class="modal-footer">
     <button class="btn" onclick="closeModal()">Cancelar</button>
     <button class="btn primary" onclick="confirmarEncerrar('${id}',this)">Encerrar e registrar itens</button>
@@ -684,7 +709,7 @@ function openEncerrar(id) {
 }
 async function confirmarEncerrar(id, btn) {
   btn.disabled = true;
-  await SB.from('pregoes').update({encerrado:true, validade_ata:val('f-validade')||null}).eq('id',id);
+  await SB.from('pregoes').update({encerrado:true}).eq('id',id);
   btn.disabled = false;
   closeModal();
   await openItens(id);
@@ -911,6 +936,11 @@ async function saveRP(pid, modo, btn) {
 async function deleteRP(id) {
   if (!confirm('Remover este RP? O saldo será restaurado automaticamente.')) return;
   await SB.from('pedidos').delete().eq('id',id);
+  renderTab();
+}
+
+function toggleOrdem(tab) {
+  ordemData[tab] = ordemData[tab] === 'desc' ? 'asc' : 'desc';
   renderTab();
 }
 
