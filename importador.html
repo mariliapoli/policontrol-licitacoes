@@ -28,23 +28,25 @@
   .progress { background: #f0ede8; border-radius: 6px; height: 10px; margin: 10px 0; overflow: hidden; display: none; }
   .progress-fill { height: 100%; background: #1d9e75; border-radius: 6px; transition: width .3s; }
   .warning { background: #faeeda; border: 1px solid #f5c06b; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #633806; margin-bottom: 16px; }
+  .section { font-size: 12px; font-weight: 700; color: #6b6b66; text-transform: uppercase; letter-spacing: .05em; margin: 20px 0 10px; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 16px; }
 </style>
 </head>
 <body>
 <div class="card">
   <h1>📥 Importador de Planilhas</h1>
-  <p>Importa dados das planilhas Excel para o banco do sistema. Rode apenas uma vez — para reimportar, limpe o banco primeiro com o SQL: <code style="background:#f0ede8;padding:2px 6px;border-radius:4px">delete from pregoes;</code></p>
+  <p>Importa dados das planilhas Excel para o banco do sistema. <strong>Rode apenas uma vez</strong> — para reimportar, limpe o banco primeiro com o SQL: <code style="background:#f0ede8;padding:2px 6px;border-radius:4px">delete from pregoes;</code></p>
   <div class="warning">⚠️ <strong>Atenção:</strong> Importar duas vezes cria dados duplicados.</div>
 
   <div class="field"><label>Supabase Project URL</label><input id="cfg-url" placeholder="https://xyzxyz.supabase.co"></div>
   <div class="field"><label>Supabase Anon Key</label><input id="cfg-key" placeholder="eyJhbGci..."></div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-    <div class="file-row"><label>Planilha de Licitações (FORM VEN 012)</label><input type="file" id="file-lic" accept=".xlsx,.xls"></div>
-    <div class="file-row"><label>Planilha de Pedidos/Saldo (FORM VEN 014)</label><input type="file" id="file-ped" accept=".xlsx,.xls"></div>
-  </div>
+  <div class="section">Planilha de Licitações (FORM VEN 012)</div>
+  <div class="file-row"><label>Controle de Licitações — abas: Pesquisa, Não participamos, Perdidas</label><input type="file" id="file-lic" accept=".xlsx,.xls"></div>
 
-  <button class="btn primary" id="btn-import" onclick="startImport()">🚀 Importar dados</button>
+  <div class="section">Planilha de Pedidos e Saldo (FORM VEN 014)</div>
+  <div class="file-row"><label>Pedidos e Saldo — abas: Vencidas/Saldo, Pedidos RC/LINE/POLI</label><input type="file" id="file-ped" accept=".xlsx,.xls"></div>
+
+  <button class="btn primary" id="btn-import" onclick="startImport()" style="margin-top:8px">🚀 Importar dados</button>
   <div class="progress" id="prog-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
   <div class="log" id="log"></div>
 </div>
@@ -86,11 +88,19 @@ async function startImport() {
     if (pingErr) throw new Error('Erro de conexão: ' + pingErr.message);
     log('✅ Conectado!\n', 'ok');
 
-    if (fileLic) await importLicitacoes(fileLic);
-    if (filePed) await importPedidosSaldo(filePed);
+    if (fileLic) {
+      log('══════ FORM VEN 012 — LICITAÇÕES ══════', 'info');
+      await importLicitacoes(fileLic);
+    }
+    setProgress(50);
 
-    log('\n🎉 Importação concluída! Acesse o sistema para ver os dados.', 'ok');
+    if (filePed) {
+      log('\n══════ FORM VEN 014 — PEDIDOS E SALDO ══════', 'info');
+      await importPedidosSaldo(filePed);
+    }
     setProgress(100);
+
+    log('\n🎉 Importação concluída! Acesse o sistema para verificar os dados.', 'ok');
   } catch(e) {
     log('\n❌ Erro fatal: ' + e.message, 'err');
     console.error(e);
@@ -98,6 +108,7 @@ async function startImport() {
   btn.disabled = false;
 }
 
+// ── Helpers ──
 async function readExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -106,19 +117,15 @@ async function readExcel(file) {
     reader.readAsBinaryString(file);
   });
 }
-
 function sheetRows(wb, name) {
-  const ws = wb.Sheets[name];
-  if (!ws) return null;
+  const ws = wb.Sheets[name]; if (!ws) return null;
   return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 }
-
 function clean(v) {
   if (v === null || v === undefined) return '';
   const s = String(v).trim();
   return (s === '-' || s === '—' || s === '--') ? '' : s;
 }
-
 function parseDate(v) {
   if (!v) return null;
   if (v instanceof Date) { if (isNaN(v)) return null; return v.toISOString().slice(0,10); }
@@ -130,25 +137,22 @@ function parseDate(v) {
     return d.toISOString().slice(0,10);
   }
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (m) {
-    const yr = m[3].length === 2 ? '20'+m[3] : m[3];
-    return `${yr}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  }
+  if (m) { const yr = m[3].length===2?'20'+m[3]:m[3]; return `${yr}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   return null;
 }
-
+function parseNum(v) {
+  if (!v && v !== 0) return null;
+  const n = Number(String(v).replace(',','.'));
+  return isNaN(n) ? null : n;
+}
 function normLit(v) {
   const s = clean(v).toUpperCase();
-  if (s === 'LINE') return 'LINE';
-  return 'RC';
+  return s === 'LINE' ? 'LINE' : 'RC';
 }
-
 const MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
-
 function findHeaderRow(rows, marker='LICITANTE') {
   return rows.findIndex(r => r.some(c => String(c).toUpperCase().trim() === marker));
 }
-
 function buildIdx(headers) {
   const h = headers.map(c => String(c).toUpperCase().trim());
   return {
@@ -161,50 +165,42 @@ function buildIdx(headers) {
     data:      h.findIndex(c => c === 'DATA'),
     site:      h.findIndex(c => c === 'SITE'),
     status:    h.findIndex(c => c === 'STATUS'),
-    obs:       h.findIndex(c => c.includes('OBS')),
+    obs:       h.findIndex(c => c.startsWith('OBS')),
     vendedor:  h.findIndex(c => c === 'VENDEDOR'),
     motivo:    h.findIndex(c => c.includes('MOTIVO')),
     produto:   h.findIndex(c => c === 'PRODUTO'),
     vencedor:  h.findIndex(c => c.includes('EMPRESA') && c.includes('VENCEDOR')),
     qtd:       h.findIndex(c => c === 'QUANTIDADE'),
     val_venc:  h.findIndex(c => c.includes('VALOR') && c.includes('VENCEDOR')),
-    val_min:   h.findIndex(c => c.includes('VALOR') && c.includes('MÍNIMO')),
-    qtd_ganha: h.findIndex(c => c.includes('GANHAMOS') || c.includes('GANHA')),
-    val_unit:  h.findIndex(c => c.includes('UNITÁRIO') || c.includes('UNIT')),
+    val_min:   h.findIndex(c => c.includes('VALOR') && (c.includes('MÍNIMO')||c.includes('MINIMO'))),
+    qtd_ganha: h.findIndex(c => c.includes('GANHAMOS') || c === 'QTD GANHA'),
+    val_unit:  h.findIndex(c => c.includes('UNITÁRIO') || c.includes('UNITARIO')),
     qtd_comp:  h.findIndex(c => c.includes('COMPRADA')),
     prazo:     h.findIndex(c => c.includes('PRAZO')),
-    validade:  h.findIndex(c => c.includes('VALIDADE') || c.includes('CONTRATO') || c.includes('ATA')),
+    // Pedidos columns
+    rp:        h.findIndex(c => c === 'RP'),
+    rp_rep:    h.findIndex(c => c.includes('REPASSE')),
+    cliente:   h.findIndex(c => c === 'CLIENTE'),
+    ped_clt:   h.findIndex(c => c.includes('PED') && c.includes('CLT')),
+    valor_tot: h.findIndex(c => c.includes('VALOR') && c.includes('TOTAL')),
+    entrega:   h.findIndex(c => c === 'ENTREGA'),
+    prorrog:   h.findIndex(c => c.includes('PRORROG')),
+    obs_sup:   h.findIndex(c => c.includes('OBS') && c.includes('SUPR')),
+    obs_lic:   h.findIndex(c => c.includes('OBS') && c.includes('LICIT')),
+    material:  h.findIndex(c => c === 'MATERIAL'),
+    quantidade:h.findIndex(c => c === 'QUANTIDADE'),
   };
-}
-
-async function batchInsert(table, rows, label) {
-  let ok = 0, err = 0;
-  const CHUNK = 20;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK);
-    const { error } = await SB.from(table).insert(chunk);
-    if (error) { log(`  ❌ Erro inserindo ${label}: ${error.message}`, 'err'); err += chunk.length; }
-    else ok += chunk.length;
-    await sleep(50);
-  }
-  return { ok, err };
 }
 
 // ══════════════════════════════════════════
 // FORM VEN 012 — LICITAÇÕES
 // ══════════════════════════════════════════
 async function importLicitacoes(file) {
-  log('\n📂 Lendo planilha de licitações...', 'info');
   const wb = await readExcel(file);
   log('Abas: ' + wb.SheetNames.join(', '));
-
   await importAba012Pesquisa(wb);
   await importAba012NaoParticipamos(wb);
   await importAba012Perdidas(wb);
-  // Vencidos also inside Form 012 if present
-  const venc = wb.SheetNames.find(s => s.toLowerCase().includes('vencid'));
-  if (venc) await importAbaVencidos(wb, venc, '25%');
-  setProgress(50);
 }
 
 async function importAba012Pesquisa(wb) {
@@ -215,91 +211,78 @@ async function importAba012Pesquisa(wb) {
   if (hi < 0) { log('⚠️ Cabeçalho Pesquisa não encontrado', 'warn'); return; }
   const idx = buildIdx(rows[hi]);
   const data = rows.slice(hi+1).filter(r => r.some(c => c !== ''));
-  log(`📋 Pesquisa: ${data.length} linhas`);
-
+  log(`\n📋 Pesquisa: ${data.length} linhas encontradas`);
   const toInsert = [];
   for (const r of data) {
-    const empresa = clean(r[idx.empresa]);
-    if (!empresa) continue;
+    const empresa = clean(r[idx.empresa]); if (!empresa) continue;
     toInsert.push({
-      licitante: normLit(r[idx.licitante]),
-      cliente: empresa,
-      uf: clean(r[idx.uf]),
-      pregao: clean(r[idx.pregao]),
-      uasg: clean(r[idx.uasg]),
-      bb: clean(r[idx.bb]),
-      data: parseDate(r[idx.data]),
-      site: clean(r[idx.site]),
-      status: clean(r[idx.status]),
-      obs: clean(r[idx.obs]),
+      licitante: normLit(r[idx.licitante]), cliente: empresa,
+      uf: clean(r[idx.uf]), pregao: clean(r[idx.pregao]),
+      uasg: clean(r[idx.uasg]), bb: clean(r[idx.bb]),
+      data: parseDate(r[idx.data]), site: clean(r[idx.site]),
+      status: clean(r[idx.status]), obs: clean(r[idx.obs]),
       vendedor: clean(r[idx.vendedor]) || 'Sem Vendedor',
-      encerrado: false,
-      fase: 'ativo',
+      encerrado: false, fase: 'ativo',
     });
   }
-  const { ok, err } = await batchInsert('pregoes', toInsert, 'pesquisa');
-  log(`✅ Pesquisa: ${ok} importados, ${err} erros`, 'ok');
+  let ok=0, err=0;
+  for (let i=0; i<toInsert.length; i+=20) {
+    const { error } = await SB.from('pregoes').insert(toInsert.slice(i,i+20));
+    if (error) { log(`  ❌ chunk ${i}: ${error.message}`, 'err'); err+=20; } else ok+=20;
+    await sleep(50);
+  }
+  log(`✅ Pesquisa: ${Math.min(ok,toInsert.length)} importados, ${err>0?err+' erros':'sem erros'}`, 'ok');
+  setProgress(15);
 }
 
 async function importAba012NaoParticipamos(wb) {
-  const name = wb.SheetNames.find(s => s.toLowerCase().includes('participamos') || s.toLowerCase().includes('não part'));
+  const name = wb.SheetNames.find(s => s.toLowerCase().includes('participamos'));
   if (!name) { log('⚠️ Aba Não participamos não encontrada', 'warn'); return; }
   const rows = sheetRows(wb, name);
-  const hi = findHeaderRow(rows);
-  if (hi < 0) return;
+  const hi = findHeaderRow(rows); if (hi < 0) return;
   const idx = buildIdx(rows[hi]);
   const data = rows.slice(hi+1).filter(r => r.some(c => c !== ''));
-  log(`📋 Não participamos: ${data.length} linhas`);
-
+  log(`\n📋 Não participamos: ${data.length} linhas`);
   const toInsert = [];
   for (const r of data) {
-    const empresa = clean(r[idx.empresa]);
-    if (!empresa) continue;
+    const empresa = clean(r[idx.empresa]); if (!empresa) continue;
     toInsert.push({
-      licitante: normLit(r[idx.licitante]),
-      cliente: empresa,
-      uf: clean(r[idx.uf]),
-      pregao: clean(r[idx.pregao]),
-      uasg: clean(r[idx.uasg]),
-      bb: clean(r[idx.bb]),
-      data: parseDate(r[idx.data]),
-      site: clean(r[idx.site]),
-      obs: clean(r[idx.motivo]),
-      encerrado: false,
-      fase: 'arquivado', // oculto por padrão
+      licitante: normLit(r[idx.licitante]), cliente: empresa,
+      uf: clean(r[idx.uf]), pregao: clean(r[idx.pregao]),
+      uasg: clean(r[idx.uasg]), bb: clean(r[idx.bb]),
+      data: parseDate(r[idx.data]), site: clean(r[idx.site]),
+      obs: clean(r[idx.motivo]), encerrado: false, fase: 'arquivado',
     });
   }
-  const { ok, err } = await batchInsert('pregoes', toInsert, 'nao_participamos');
-  log(`✅ Não participamos: ${ok} importados (ocultos), ${err} erros`, 'ok');
+  let ok=0, err=0;
+  for (let i=0; i<toInsert.length; i+=20) {
+    const { error } = await SB.from('pregoes').insert(toInsert.slice(i,i+20));
+    if (error) { log(`  ❌ chunk ${i}: ${error.message}`, 'err'); err+=20; } else ok+=20;
+    await sleep(50);
+  }
+  log(`✅ Não participamos: ${Math.min(ok,toInsert.length)} importados (ocultos)`, 'ok');
+  setProgress(30);
 }
 
 async function importAba012Perdidas(wb) {
   const name = wb.SheetNames.find(s => s.toLowerCase().includes('perdida'));
   if (!name) { log('⚠️ Aba Perdidas não encontrada', 'warn'); return; }
   const rows = sheetRows(wb, name);
-  const hi = findHeaderRow(rows);
-  if (hi < 0) return;
+  const hi = findHeaderRow(rows); if (hi < 0) return;
   const idx = buildIdx(rows[hi]);
   const data = rows.slice(hi+1).filter(r => r.some(c => c !== ''));
-  log(`📋 Perdidas: ${data.length} linhas`);
-
-  // Group by pregão (handle merged rows where empresa is blank)
-  const grupos = {};
-  let cur = {};
+  log(`\n📋 Perdidas: ${data.length} linhas`);
+  const grupos = {}; let cur = {};
   for (const r of data) {
     const first = clean(r[0]).toUpperCase();
     if (MESES.includes(first)) continue;
     const empresa = clean(r[idx.empresa]);
     if (empresa) {
       cur = {
-        licitante: normLit(r[idx.licitante]),
-        cliente: empresa,
-        uf: clean(r[idx.uf]),
-        pregao: clean(r[idx.pregao]),
-        uasg: clean(r[idx.uasg]),
-        bb: clean(r[idx.bb]),
-        data: parseDate(r[idx.data]),
-        site: clean(r[idx.site]),
+        licitante: normLit(r[idx.licitante]), cliente: empresa,
+        uf: clean(r[idx.uf]), pregao: clean(r[idx.pregao]),
+        uasg: clean(r[idx.uasg]), bb: clean(r[idx.bb]),
+        data: parseDate(r[idx.data]), site: clean(r[idx.site]),
       };
     }
     const produto = clean(r[idx.produto]);
@@ -307,126 +290,231 @@ async function importAba012Perdidas(wb) {
     const key = `${cur.licitante}|${cur.cliente}|${cur.pregao}`;
     if (!grupos[key]) grupos[key] = { ...cur, encerrado: true, fase: 'ativo', itens: [] };
     grupos[key].itens.push({
-      produto,
-      resultado: 'perdido',
+      produto, resultado: 'perdido',
       empresa_venc: clean(r[idx.vencedor]),
-      qtd_venc: Number(clean(r[idx.qtd])) || null,
+      qtd_venc: parseNum(r[idx.qtd]),
       valor_venc: parseNum(r[idx.val_venc]),
       valor_min: parseNum(r[idx.val_min]),
       motivo_perda: clean(r[idx.motivo]),
     });
   }
-
-  let ok = 0, err = 0;
+  let ok=0, err=0;
   for (const p of Object.values(grupos)) {
     const { data: ins, error } = await SB.from('pregoes').insert({
-      licitante:p.licitante,cliente:p.cliente,uf:p.uf,pregao:p.pregao,
-      uasg:p.uasg,bb:p.bb,data:p.data,site:p.site,encerrado:true,fase:'ativo'
+      licitante:p.licitante, cliente:p.cliente, uf:p.uf, pregao:p.pregao,
+      uasg:p.uasg, bb:p.bb, data:p.data, site:p.site, encerrado:true, fase:'ativo'
     }).select('id').single();
     if (error) { err++; continue; }
-    if (p.itens.length) await SB.from('itens').insert(p.itens.map(it=>({...it,pregao_id:ins.id})));
-    ok++;
-    await sleep(30);
+    if (p.itens.length) await SB.from('itens').insert(p.itens.map(it=>({...it, pregao_id:ins.id})));
+    ok++; await sleep(30);
   }
   log(`✅ Perdidas: ${ok} pregões importados, ${err} erros`, 'ok');
+  setProgress(45);
 }
 
 // ══════════════════════════════════════════
 // FORM VEN 014 — PEDIDOS E SALDO
 // ══════════════════════════════════════════
 async function importPedidosSaldo(file) {
-  log('\n📂 Lendo planilha de pedidos e saldo...', 'info');
   const wb = await readExcel(file);
   log('Abas: ' + wb.SheetNames.join(', '));
 
-  // Import all saldo sheets (2024, 2025, 2026)
+  // 1. Import saldo sheets (creates pregoes with itens ganhos + qtd_comprada as historical RPs)
   const saldoSheets = wb.SheetNames.filter(s =>
     s.toLowerCase().includes('saldo') || s.toLowerCase().includes('vencida')
   );
-  log(`Abas de saldo encontradas: ${saldoSheets.join(', ')}`);
-
+  log(`\nAbas de saldo: ${saldoSheets.join(', ')}`);
   for (const name of saldoSheets) {
     await importAbaSaldo(wb, name);
   }
-  setProgress(90);
+  setProgress(70);
+
+  // 2. Import pedidos sheets (creates real RPs)
+  const pedidosSheets = wb.SheetNames.filter(s =>
+    s.toLowerCase().includes('pedido') && !s.toLowerCase().includes('saldo')
+  );
+  log(`\nAbas de pedidos: ${pedidosSheets.join(', ')}`);
+  for (const name of pedidosSheets) {
+    await importAbaPedidos(wb, name);
+  }
+  setProgress(95);
 }
 
 async function importAbaSaldo(wb, name) {
-  const rows = sheetRows(wb, name);
-  if (!rows) return;
+  const rows = sheetRows(wb, name); if (!rows) return;
   const hi = findHeaderRow(rows);
   if (hi < 0) { log(`⚠️ Cabeçalho não encontrado em "${name}"`, 'warn'); return; }
   const idx = buildIdx(rows[hi]);
-  const data = rows.slice(hi+1).filter(r => r.some(c => c !== ''));
-  log(`📋 "${name}": ${data.length} linhas`);
+  log(`\n📋 "${name}": processando...`);
 
-  // Group by pregão — can have both ganho and perdido items
-  const grupos = {};
-  let cur = {};
-
-  for (const r of data) {
+  // Group rows by pregão
+  const grupos = {}; let cur = {};
+  for (const r of rows.slice(hi+1)) {
+    if (!r.some(c => c !== '')) continue;
     const first = clean(r[0]).toUpperCase();
     if (MESES.includes(first)) continue;
+    // Skip totals rows
+    if (first === 'TOTAL') continue;
 
     const empresa = idx.empresa >= 0 ? clean(r[idx.empresa]) : '';
     const pregao  = idx.pregao  >= 0 ? clean(r[idx.pregao])  : '';
-
     if (empresa) {
       cur = {
-        licitante: normLit(r[0]),
-        cliente: empresa,
-        pregao,
+        licitante: normLit(r[0]), cliente: empresa, pregao,
+        uf: idx.uf >= 0 ? clean(r[idx.uf]) : '',
+        uasg: idx.uasg >= 0 ? clean(r[idx.uasg]) : '',
+        data: idx.data >= 0 ? parseDate(r[idx.data]) : null,
+        site: idx.site >= 0 ? clean(r[idx.site]) : '',
         prazo_entrega: idx.prazo >= 0 ? clean(r[idx.prazo]) : '',
-        validade_ata: idx.validade >= 0 ? parseDate(r[idx.validade]) : null,
       };
     }
-
     const produto = idx.produto >= 0 ? clean(r[idx.produto]) : '';
     if (!produto || !cur.pregao) continue;
 
     const key = `${cur.licitante}|${cur.cliente}|${cur.pregao}`;
-    if (!grupos[key]) grupos[key] = { ...cur, encerrado: true, fase: 'ativo', itens: [] };
-
-    const qtdGanha = idx.qtd_ganha >= 0 ? Number(clean(r[idx.qtd_ganha]))||0 : 0;
-    const valUnit  = idx.val_unit  >= 0 ? parseNum(r[idx.val_unit]) : null;
-
-    // Saldo sheet only contains won items — always mark as ganho
+    if (!grupos[key]) grupos[key] = { ...cur, itens: [] };
     grupos[key].itens.push({
-      produto, resultado: 'ganho',
-      qtd_ganha: qtdGanha,
-      valor_unit: valUnit,
+      produto,
+      resultado: 'ganho',
+      qtd_ganha: parseNum(r[idx.qtd_ganha]) || 0,
+      valor_unit: parseNum(r[idx.val_unit]),
+      qtd_comprada: parseNum(r[idx.qtd_comp]) || 0, // historical purchased qty
     });
   }
 
-  let ok = 0, err = 0;
+  let ok=0, err=0;
   for (const p of Object.values(grupos)) {
-    const { data: ins, error } = await SB.from('pregoes').insert({
-      licitante: p.licitante,
-      cliente: p.cliente,
-      pregao: p.pregao,
-      prazo_entrega: p.prazo_entrega,
-      validade_ata: p.validade_ata,
-      encerrado: true,
-      fase: 'ativo',
-    }).select('id').single();
+    if (!p.cliente || !p.pregao) continue;
 
-    if (error) { log(`  ❌ ${p.cliente} — ${error.message}`, 'err'); err++; continue; }
-    if (p.itens.length) await SB.from('itens').insert(p.itens.map(it=>({...it, pregao_id:ins.id})));
-    ok++;
-    await sleep(30);
+    // Insert pregão
+    const { data: ins, error } = await SB.from('pregoes').insert({
+      licitante: p.licitante, cliente: p.cliente, pregao: p.pregao,
+      uf: p.uf, uasg: p.uasg, data: p.data, site: p.site,
+      prazo_entrega: p.prazo_entrega, encerrado: true, fase: 'ativo',
+    }).select('id').single();
+    if (error) { log(`  ❌ ${p.cliente}: ${error.message}`, 'err'); err++; continue; }
+
+    // Insert itens and create historical RP for qtd_comprada
+    for (const it of p.itens) {
+      const { data: itIns, error: itErr } = await SB.from('itens').insert({
+        pregao_id: ins.id, produto: it.produto, resultado: 'ganho',
+        qtd_ganha: it.qtd_ganha, valor_unit: it.valor_unit,
+      }).select('id').single();
+      if (itErr) continue;
+
+      // If there's a historical qty purchased, create a hidden "histórico" RP
+      if (it.qtd_comprada > 0) {
+        const { data: rp } = await SB.from('pedidos').insert({
+          pregao_id: ins.id, licitante: p.licitante,
+          numero: 'HISTÓRICO', cliente: p.cliente, uf: p.uf,
+          valor_total: (it.qtd_comprada * (it.valor_unit||0)),
+          avulso: false, obs_lic: 'Importado da planilha histórica',
+        }).select('id').single();
+        if (rp) {
+          await SB.from('pedido_itens').insert({
+            pedido_id: rp.id, item_id: itIns.id,
+            produto: it.produto, qtd: it.qtd_comprada,
+          });
+        }
+      }
+    }
+    ok++; await sleep(40);
   }
   log(`✅ "${name}": ${ok} pregões importados, ${err} erros`, 'ok');
 }
 
-async function importAbaVencidos(wb, name) {
-  return importAbaSaldo(wb, name); // same logic
-}
+async function importAbaPedidos(wb, name) {
+  const rows = sheetRows(wb, name); if (!rows) return;
+  const hi = findHeaderRow(rows, 'RP');
+  if (hi < 0) { log(`⚠️ Cabeçalho não encontrado em "${name}"`, 'warn'); return; }
+  const idx = buildIdx(rows[hi]);
+  // Detect licitante from sheet name
+  const litFromSheet = name.toUpperCase().includes('LINE') ? 'LINE' : 'RC';
+  log(`\n📋 "${name}" (${litFromSheet}): processando...`);
 
-function parseNum(v) {
-  if (!v && v !== 0) return null;
-  const s = String(v).replace(',','.');
-  const n = Number(s);
-  return isNaN(n) ? null : n;
+  // Group by RP number (multiple rows per RP = multiple products)
+  const rps = {}; let curMes = '';
+  for (const r of rows.slice(hi+1)) {
+    if (!r.some(c => c !== '')) continue;
+    const first = clean(r[0]).toUpperCase();
+    if (MESES.includes(first)) { curMes = first; continue; }
+    if (first === 'TOTAL' || !first) continue;
+
+    const rpNum = clean(r[idx.rp]);
+    if (!rpNum || isNaN(Number(rpNum))) continue; // skip non-RP rows
+
+    const cliente = clean(r[idx.cliente]);
+    const pregaoStr = clean(r[idx.pregao]);
+    const material = clean(r[idx.material]);
+    const qtdStr = clean(r[idx.quantidade]);
+
+    if (!rps[rpNum]) {
+      rps[rpNum] = {
+        numero: rpNum,
+        rp_repasse: clean(r[idx.rp_rep]),
+        cliente, uf: clean(r[idx.uf]),
+        pregao: pregaoStr,
+        ped_clt: clean(r[idx.ped_clt]),
+        valor_total: parseNum(r[idx.valor_tot]),
+        entrega: parseDate(r[idx.entrega]),
+        prorrogacao: parseDate(r[idx.prorrog]),
+        obs_sup: clean(r[idx.obs_sup]),
+        obs_lic: clean(r[idx.obs_lic]),
+        licitante: litFromSheet,
+        itens: [],
+      };
+    }
+
+    // Material and quantity may be multi-value separated by spaces/newlines
+    if (material) {
+      const mats = material.split(/\n|  +/).map(s=>s.trim()).filter(Boolean);
+      const qtds = qtdStr.split(/\n|  +/).map(s=>s.trim()).filter(Boolean);
+      mats.forEach((m, i) => {
+        if (m) rps[rpNum].itens.push({ produto: m, qtd: parseNum(qtds[i]) || 1 });
+      });
+    }
+  }
+
+  // Now find matching pregão in DB and insert pedidos
+  let ok=0, skip=0, err=0;
+  for (const rp of Object.values(rps)) {
+    if (!rp.pregao && !rp.cliente) { skip++; continue; }
+
+    // Try to find the pregão in DB
+    let pregaoId = null;
+    if (rp.pregao && rp.cliente) {
+      const { data: found } = await SB.from('pregoes')
+        .select('id')
+        .eq('licitante', rp.licitante)
+        .ilike('cliente', `%${rp.cliente.substring(0,15)}%`)
+        .ilike('pregao', `%${rp.pregao.substring(0,10)}%`)
+        .limit(1);
+      if (found && found.length) pregaoId = found[0].id;
+    }
+
+    // Build material summary for obs
+    const matResumo = rp.itens.map(it => `${it.produto}: ${it.qtd}`).join(' | ');
+    const obsLicFinal = [rp.obs_lic, matResumo ? `Materiais: ${matResumo}` : ''].filter(Boolean).join(' — ');
+
+    const { data: pedIns, error } = await SB.from('pedidos').insert({
+      pregao_id: pregaoId,
+      licitante: rp.licitante,
+      numero: rp.numero,
+      rp_repasse: rp.rp_repasse,
+      cliente: rp.cliente,
+      uf: rp.uf,
+      valor_total: rp.valor_total,
+      entrega: rp.entrega,
+      prorrogacao: rp.prorrogacao,
+      obs_sup: rp.obs_sup,
+      obs_lic: obsLicFinal,
+      avulso: !pregaoId,
+    }).select('id').single();
+
+    if (error) { err++; continue; }
+    ok++; await sleep(30);
+  }
+  log(`✅ "${name}": ${ok} RPs importados, ${skip} ignorados, ${err} erros`, 'ok');
 }
 </script>
 </body>
