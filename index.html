@@ -158,6 +158,8 @@ let currentTab = 'pesquisa';
 let companyFilter = '';
 let buscas = {pesquisa:'',resultado:'',saldo:'',pedidos:''};
 let filtros = {uf:''};
+let filtroResultado = ''; // '' | 'ganho' | 'perdido'
+let filtroSaldoResultado = ''; // '' | 'ganho' | 'perdido'
 let mostrarArquivados = false;
 let filtroMesSaldo = '';
 let filtroMesPedidos = '';
@@ -355,6 +357,11 @@ async function renderResultado() {
 
   let html = `<div class="toolbar">
     <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.resultado)}" oninput="onBusca('resultado',this.value)">
+    <div class="filter-company">
+      <button class="${!filtroResultado?'active':''}" onclick="filtroResultado='';renderTab()">Todos</button>
+      <button class="${filtroResultado==='ganho'?'active':''}" onclick="filtroResultado='ganho';renderTab()">✅ Ganhos</button>
+      <button class="${filtroResultado==='perdido'?'active':''}" onclick="filtroResultado='perdido';renderTab()">❌ Perdidos</button>
+    </div>
     <button class="btn ghost" onclick="toggleOrdem('resultado')" style="font-size:12px">${ordemData.resultado==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
     <button class="btn ghost" onclick="exportarResultados()" style="font-size:12px">📥 Exportar</button>
   </div>`;
@@ -363,6 +370,9 @@ async function renderResultado() {
   lista.forEach(p => {
     const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
     const perdidos = (p.itens||[]).filter(i=>i.resultado==='perdido');
+    // Apply ganho/perdido filter — only show cards that have at least one matching item
+    if (filtroResultado === 'ganho' && !ganhos.length) return;
+    if (filtroResultado === 'perdido' && !perdidos.length) return;
     html += `<div class="card" style="${p.em_andamento?'border-color:#1d9e75;border-width:2px':''}">
     <div class="card-header">
       <div class="card-title">${esc(p.cliente||'s/cliente')} — ${esc(p.pregao||'s/nº')}</div>
@@ -442,6 +452,11 @@ async function renderSaldo() {
     });
   }
 
+  // Filtro ganho/perdido
+  if (filtroSaldoResultado) {
+    lista = lista.filter(p => (p.itens||[]).some(i => i.resultado === filtroSaldoResultado));
+  }
+
   lista.sort((a,b) => {
     const da = a.data||a.validade_ata||'', db = b.data||b.validade_ata||'';
     return ordemData.saldo === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
@@ -466,6 +481,11 @@ async function renderSaldo() {
   let html = `<div class="toolbar">
     <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.saldo)}" oninput="onBusca('saldo',this.value)">
     <select onchange="filtroMesSaldo=this.value;renderTab()">${mesOpts(filtroMesSaldo)}</select>
+    <div class="filter-company">
+      <button class="${!filtroSaldoResultado?'active':''}" onclick="filtroSaldoResultado='';renderTab()">Todos</button>
+      <button class="${filtroSaldoResultado==='ganho'?'active':''}" onclick="filtroSaldoResultado='ganho';renderTab()">✅ Ganhos</button>
+      <button class="${filtroSaldoResultado==='perdido'?'active':''}" onclick="filtroSaldoResultado='perdido';renderTab()">❌ Perdidos</button>
+    </div>
     <button class="btn ghost" onclick="ocultarSaldoZerado=!ocultarSaldoZerado;renderTab()" style="font-size:12px">${ocultarSaldoZerado?'👁 Mostrar saldo zerado':'🚫 Ocultar saldo zerado'}</button>
     <button class="btn ghost" onclick="toggleOrdem('saldo')" style="font-size:12px">${ordemData.saldo==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
     <button class="btn ghost" onclick="exportarSaldo()" style="font-size:12px">📥 Exportar</button>
