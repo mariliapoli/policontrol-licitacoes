@@ -6,868 +6,787 @@
 <title>Policontrol — Licitações</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  /* ── Reset & base ── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #f5f4f0;
-    --surface: #ffffff;
-    --surface2: #f0ede8;
-    --border: rgba(0,0,0,0.12);
-    --border2: rgba(0,0,0,0.22);
-    --text: #1a1a18;
-    --text2: #6b6b66;
-    --text3: #9b9b96;
-    --accent: #1a1a18;
-    --accent-fg: #ffffff;
-    --radius: 8px;
-    --radius-lg: 12px;
-    --green-bg: #eaf3de; --green-fg: #27500a;
-    --red-bg: #fcebeb;   --red-fg: #791f1f;
-    --amber-bg: #faeeda; --amber-fg: #633806;
-    --blue-bg: #e6f1fb;  --blue-fg: #0c447c;
-    --purple-bg: #eeedfe;--purple-fg: #3c3489;
-    --gray-bg: #f1efe8;  --gray-fg: #444441;
-    --teal-bg: #e1f5ee;  --teal-fg: #085041;
-    --coral-bg: #faece7; --coral-fg: #712b13;
+    --bg: #f5f4f0; --surface: #ffffff; --surface2: #f0ede8;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --text: #1a1a18; --text2: #6b6b66; --text3: #9b9b96;
+    --accent: #1a1a18; --accent-fg: #ffffff; --radius: 8px; --radius-lg: 12px;
+    --green-bg:#eaf3de;--green-fg:#27500a;--red-bg:#fcebeb;--red-fg:#791f1f;
+    --amber-bg:#faeeda;--amber-fg:#633806;--blue-bg:#e6f1fb;--blue-fg:#0c447c;
+    --purple-bg:#eeedfe;--purple-fg:#3c3489;--gray-bg:#f1efe8;--gray-fg:#444441;
+    --teal-bg:#e1f5ee;--teal-fg:#085041;--coral-bg:#faece7;--coral-fg:#712b13;
   }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; background: var(--bg); color: var(--text); min-height: 100vh; }
-  
-  /* ── Layout ── */
-  .topbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
-  .topbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
-  .topbar-right { display: flex; align-items: center; gap: 8px; }
-  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; }
-  .tab { padding: 10px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text2); transition: all .15s; white-space: nowrap; }
-  .tab.active { color: var(--text); border-bottom-color: var(--text); }
-  .tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
-  .content { padding: 20px; max-width: 1100px; margin: 0 auto; }
-
-  /* ── Buttons ── */
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--surface); color: var(--text); cursor: pointer; transition: all .15s; white-space: nowrap; }
-  .btn:hover { background: var(--surface2); }
-  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-  .btn.primary:hover { opacity: .85; }
-  .btn.sm { padding: 4px 9px; font-size: 12px; }
-  .btn.danger { color: #791f1f; border-color: #f09595; }
-  .btn.danger:hover { background: var(--red-bg); }
-  .btn:disabled { opacity: .4; cursor: default; }
-
-  /* ── Cards ── */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 10px; }
-  .card-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-  .card-title { font-size: 14px; font-weight: 600; flex: 1; min-width: 140px; }
-  .card-meta { font-size: 12px; color: var(--text2); display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
-  .card-meta span { display: flex; align-items: center; gap: 4px; }
-
-  /* ── Badges ── */
-  .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-  .b-blue   { background: var(--blue-bg);   color: var(--blue-fg); }
-  .b-green  { background: var(--green-bg);  color: var(--green-fg); }
-  .b-amber  { background: var(--amber-bg);  color: var(--amber-fg); }
-  .b-red    { background: var(--red-bg);    color: var(--red-fg); }
-  .b-gray   { background: var(--gray-bg);   color: var(--gray-fg); }
-  .b-purple { background: var(--purple-bg); color: var(--purple-fg); }
-  .b-teal   { background: var(--teal-bg);   color: var(--teal-fg); }
-  .b-coral  { background: var(--coral-bg);  color: var(--coral-fg); }
-
-  /* ── Toolbar / Filters ── */
-  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .toolbar input, .toolbar select { font-size: 13px; padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--surface); color: var(--text); }
-  .toolbar input { flex: 1; min-width: 180px; }
-  .filter-company { display: flex; gap: 0; border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; }
-  .filter-company button { padding: 7px 14px; font-size: 12px; font-weight: 600; background: var(--surface); border: none; cursor: pointer; color: var(--text2); transition: all .15s; }
-  .filter-company button.active { background: var(--accent); color: var(--accent-fg); }
-
-  /* ── Stats ── */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
-  .stat { background: var(--surface2); border-radius: var(--radius); padding: 12px 14px; }
-  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
-  .stat-value { font-size: 24px; font-weight: 600; }
-
-  /* ── Form fields ── */
-  .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 110px; }
-  .field label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
-  .field input, .field select, .field textarea { font-size: 13px; padding: 7px 9px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--surface); color: var(--text); width: 100%; }
-  .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .field input[readonly] { background: var(--surface2); color: var(--text2); cursor: default; }
-  .field textarea { resize: vertical; min-height: 56px; }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-
-  /* ── Modal ── */
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-  .modal { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 24px; width: 100%; max-width: 680px; max-height: 92vh; overflow-y: auto; }
-  .modal h2 { font-size: 17px; font-weight: 600; margin-bottom: 18px; }
-  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
-  .modal-footer-left { margin-right: auto; display: flex; gap: 8px; }
-
-  /* ── Section label ── */
-  .sec { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .07em; margin: 16px 0 8px; }
-  .divider { height: 1px; background: var(--border); margin: 14px 0; }
-
-  /* ── Item blocks ── */
-  .item-block { border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; background: var(--surface2); }
-  .item-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; background: var(--surface2); }
-
-  /* ── Saldo bar ── */
-  .saldo-bar { height: 5px; border-radius: 3px; background: var(--border); margin-top: 5px; overflow: hidden; }
-  .saldo-fill { height: 100%; border-radius: 3px; background: #1d9e75; }
-
-  /* ── Toggle ── */
-  .toggle-row { display: flex; border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
-  .toggle-opt { flex: 1; padding: 8px 12px; font-size: 13px; font-weight: 500; text-align: center; cursor: pointer; color: var(--text2); background: var(--surface); transition: all .15s; }
-  .toggle-opt.active { background: var(--accent); color: var(--accent-fg); }
-
-  /* ── Info box ── */
-  .info-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
-  .info-box .ib-label { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
-  .info-box .ib-value { font-size: 13px; font-weight: 600; }
-  .info-box .ib-row { display: flex; flex-wrap: wrap; gap: 18px; }
-  .info-box .ib-item { display: flex; flex-direction: column; }
-
-  /* ── Loading / Empty ── */
-  .loading { text-align: center; padding: 48px; color: var(--text2); }
-  .empty { text-align: center; padding: 48px; color: var(--text2); font-size: 13px; }
-  .empty-icon { font-size: 36px; margin-bottom: 10px; }
-  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Misc ── */
-  .tag-row { display: flex; flex-wrap: wrap; gap: 5px; }
-  .rp-line { display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-  .rp-line:last-child { border-bottom: none; }
-  .divider-label { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; }
-  .divider-label::before, .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-  .total-display { font-size: 20px; font-weight: 700; color: var(--green-fg); }
-
-  /* ── Config banner ── */
-  #config-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 200; }
-  .config-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; width: 100%; max-width: 480px; }
-  .config-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
-  .config-card p { font-size: 13px; color: var(--text2); margin-bottom: 24px; line-height: 1.6; }
-  .config-card .field { margin-bottom: 14px; }
+  .topbar { display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10; }
+  .topbar h1 { font-size:16px;font-weight:600;flex:1; }
+  .tabs { display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px; }
+  .tab { padding:10px 16px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);transition:all .15s;white-space:nowrap; }
+  .tab.active { color:var(--text);border-bottom-color:var(--text); }
+  .tab:hover:not(.active) { color:var(--text);background:var(--surface2); }
+  .content { padding:20px;max-width:1100px;margin:0 auto; }
+  .btn { display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:13px;font-weight:500;border-radius:var(--radius);border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;transition:all .15s;white-space:nowrap; }
+  .btn:hover { background:var(--surface2); }
+  .btn.primary { background:var(--accent);color:var(--accent-fg);border-color:var(--accent); }
+  .btn.primary:hover { opacity:.85; }
+  .btn.sm { padding:4px 9px;font-size:12px; }
+  .btn.danger { color:#791f1f;border-color:#f09595; }
+  .btn.danger:hover { background:var(--red-bg); }
+  .btn.ghost { border-color:transparent;background:transparent; }
+  .btn.ghost:hover { background:var(--surface2); }
+  .btn:disabled { opacity:.4;cursor:default; }
+  .card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px; }
+  .card-header { display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;flex-wrap:wrap; }
+  .card-title { font-size:14px;font-weight:600;flex:1;min-width:140px; }
+  .card-meta { font-size:12px;color:var(--text2);display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px; }
+  .badge { display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap; }
+  .b-blue{background:var(--blue-bg);color:var(--blue-fg)}.b-green{background:var(--green-bg);color:var(--green-fg)}
+  .b-amber{background:var(--amber-bg);color:var(--amber-fg)}.b-red{background:var(--red-bg);color:var(--red-fg)}
+  .b-gray{background:var(--gray-bg);color:var(--gray-fg)}.b-purple{background:var(--purple-bg);color:var(--purple-fg)}
+  .b-teal{background:var(--teal-bg);color:var(--teal-fg)}.b-coral{background:var(--coral-bg);color:var(--coral-fg)}
+  .toolbar { display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap; }
+  .toolbar input,.toolbar select { font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--surface);color:var(--text); }
+  .toolbar input { flex:1;min-width:180px; }
+  .filter-company { display:flex;gap:0;border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden; }
+  .filter-company button { padding:7px 14px;font-size:12px;font-weight:600;background:var(--surface);border:none;cursor:pointer;color:var(--text2);transition:all .15s; }
+  .filter-company button.active { background:var(--accent);color:var(--accent-fg); }
+  .field { display:flex;flex-direction:column;gap:5px;flex:1;min-width:110px; }
+  .field label { font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em; }
+  .field input,.field select,.field textarea { font-size:13px;padding:7px 9px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--surface);color:var(--text);width:100%; }
+  .field input:focus,.field select:focus,.field textarea:focus { outline:2px solid var(--accent);outline-offset:1px; }
+  .field input[readonly] { background:var(--surface2);color:var(--text2);cursor:default; }
+  .field textarea { resize:vertical;min-height:56px; }
+  .row { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px; }
+  .modal-bg { position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px; }
+  .modal { background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:24px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto; }
+  .modal h2 { font-size:17px;font-weight:600;margin-bottom:18px; }
+  .modal-footer { display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border); }
+  .modal-footer-left { margin-right:auto;display:flex;gap:8px; }
+  .sec { font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 8px; }
+  .item-block { border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:8px;background:var(--surface2); }
+  .item-row { display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;background:var(--surface2); }
+  .saldo-bar { height:5px;border-radius:3px;background:var(--border);margin-top:5px;overflow:hidden; }
+  .saldo-fill { height:100%;border-radius:3px;background:#1d9e75; }
+  .toggle-row { display:flex;border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden;margin-bottom:16px; }
+  .toggle-opt { flex:1;padding:8px 12px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;color:var(--text2);background:var(--surface);transition:all .15s; }
+  .toggle-opt.active { background:var(--accent);color:var(--accent-fg); }
+  .info-box { background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px; }
+  .info-box .ib-label { font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px; }
+  .info-box .ib-value { font-size:13px;font-weight:600; }
+  .info-box .ib-row { display:flex;flex-wrap:wrap;gap:18px; }
+  .info-box .ib-item { display:flex;flex-direction:column; }
+  .loading { text-align:center;padding:48px;color:var(--text2); }
+  .empty { text-align:center;padding:48px;color:var(--text2);font-size:13px; }
+  .spinner { display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .tag-row { display:flex;flex-wrap:wrap;gap:5px; }
+  .rp-line { display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap; }
+  .rp-line:last-child { border-bottom:none; }
+  .divider-label { display:flex;align-items:center;gap:8px;margin:16px 0 10px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em; }
+  .divider-label::before,.divider-label::after { content:'';flex:1;height:1px;background:var(--border); }
+  .total-display { font-size:20px;font-weight:700;color:var(--green-fg); }
+  .alert-ata { background:#fff3cd;border:1px solid #ffc107;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#856404;margin-top:6px;display:flex;align-items:center;gap:6px; }
+  #config-screen { position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:200; }
+  .config-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:480px; }
+  .config-card h2 { font-size:20px;font-weight:700;margin-bottom:8px; }
+  .config-card p { font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6; }
+  .config-card .field { margin-bottom:14px; }
 </style>
 </head>
 <body>
 
-<!-- Config screen (first time setup) -->
 <div id="config-screen">
   <div class="config-card">
     <h2>⚙️ Configuração inicial</h2>
     <p>Cole as credenciais do seu projeto Supabase.<br>Você as encontra em <strong>Settings → API</strong> no painel do Supabase.</p>
     <div class="field"><label>Project URL</label><input id="cfg-url" placeholder="https://xyzxyz.supabase.co"></div>
     <div class="field"><label>Anon / Public Key</label><input id="cfg-key" placeholder="eyJhbGci..."></div>
-    <button class="btn primary" style="width:100%;justify-content:center;margin-top:8px" onclick="App.saveConfig()">Conectar</button>
-    <p style="margin-top:12px;font-size:11px;color:var(--text3)">As credenciais ficam salvas localmente neste navegador. Cada computador que acessar precisa fazer isso uma vez.</p>
+    <button class="btn primary" style="width:100%;justify-content:center;margin-top:8px" onclick="saveConfig()">Conectar</button>
+    <p style="margin-top:12px;font-size:11px;color:var(--text3)">As credenciais ficam salvas localmente neste navegador. Cada computador precisa fazer isso uma vez.</p>
   </div>
 </div>
 
-<!-- Main app -->
 <div id="main-app" style="display:none">
   <div class="topbar">
     <span style="font-size:20px">📋</span>
     <h1>Policontrol — Licitações</h1>
-    <div class="topbar-right">
+    <div style="display:flex;align-items:center;gap:8px">
       <div class="filter-company" id="company-filter">
-        <button class="active" onclick="App.setCompany('',this)">Todas</button>
-        <button onclick="App.setCompany('LINE',this)">LINE</button>
-        <button onclick="App.setCompany('RC',this)">RC</button>
+        <button class="active" onclick="setCompany('',this)">Todas</button>
+        <button onclick="setCompany('LINE',this)">LINE</button>
+        <button onclick="setCompany('RC',this)">RC</button>
       </div>
-      <button class="btn primary" onclick="App.openNewPregao()">+ Novo pregão</button>
+      <button class="btn primary" onclick="openNewPregao()">+ Novo pregão</button>
     </div>
   </div>
   <div class="tabs">
-    <div class="tab active" onclick="App.switchTab('pesquisa',this)">Pesquisa</div>
-    <div class="tab" onclick="App.switchTab('resultado',this)">Resultados</div>
-    <div class="tab" onclick="App.switchTab('saldo',this)">Saldo / Contratos</div>
-    <div class="tab" onclick="App.switchTab('pedidos',this)">Pedidos (RPs)</div>
+    <div class="tab active" onclick="switchTab('pesquisa',this)">Pesquisa</div>
+    <div class="tab" onclick="switchTab('resultado',this)">Resultados</div>
+    <div class="tab" onclick="switchTab('saldo',this)">Saldo / Contratos</div>
+    <div class="tab" onclick="switchTab('pedidos',this)">Pedidos (RPs)</div>
   </div>
   <div class="content" id="tab-content">
     <div class="loading"><div class="spinner"></div></div>
   </div>
 </div>
-
 <div id="modal-root"></div>
 
 <script>
-const App = (() => {
-  // ── Constants ──
-  const LICITANTES = ['LINE','RC'];
-  const VENDEDORES = ['Sem Vendedor','Roberto','Antônio','Mariucha','Yuri','Luciana Duarte - MG','Luciana Azevedo'];
-  const STATUS_OPTS = ['Aguardando retorno PH/Mário','Atenção!','Buscar novo edital','Cadastrar proposta','Dúvidas técnicas','Edital não encontrado','Proposta cadastrada','Verificar cadastro','Aguardando retorno Rafael','Revenda','Continuidade','Pregão Presencial'];
-  const FIN_OPTS = ['—','OK','SERASA','SANDRA'];
-  const UF_OPTS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
-  const MOTIVOS_PERDA = ['Preço','Desclassificados','Tempo aleatório','Erro operacional','Fracassado','Lance fechado','Outros'];
+// ── Globals ──
+let SB = null;
+let currentTab = 'pesquisa';
+let companyFilter = '';
+let buscas = {pesquisa:'',resultado:'',saldo:'',pedidos:''};
+let filtros = {uf:''};
+let mostrarArquivados = false;
+let _editingItens = [];
+let _avulsoItens = [];
+let _rpPregao = null;
+let _itensP = null;
 
-  // ── State ──
-  let sb = null;
-  let currentTab = 'pesquisa';
-  let companyFilter = '';
-  let buscas = { pesquisa:'', resultado:'', saldo:'', pedidos:'' };
-  let filtros = { uf:'' };
-  let editingItens = [];
-  let avulsoItens = [];
+const LICITANTES = ['LINE','RC'];
+const VENDEDORES = ['Sem Vendedor','Roberto','Antônio','Mariucha','Yuri','Luciana Duarte - MG','Luciana Azevedo'];
+const STATUS_OPTS = ['Aguardando retorno PH/Mário','Atenção!','Buscar novo edital','Cadastrar proposta','Dúvidas técnicas','Edital não encontrado','Proposta cadastrada','Verificar cadastro','Aguardando retorno Rafael','Revenda','Continuidade','Pregão Presencial'];
+const FIN_OPTS = ['—','OK','SERASA','SANDRA'];
+const UF_OPTS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+const MOTIVOS_PERDA = ['Preço','Desclassificados','Tempo aleatório','Erro operacional','Fracassado','Lance fechado','Outros'];
 
-  // ── Supabase init ──
-  function saveConfig() {
-    const url = g('cfg-url').value.trim();
-    const key = g('cfg-key').value.trim();
-    if (!url || !key) return alert('Preencha URL e Key');
-    localStorage.setItem('sb_url', url);
-    localStorage.setItem('sb_key', key);
-    initSupabase(url, key);
-  }
+// ── Init ──
+function saveConfig() {
+  const url = document.getElementById('cfg-url').value.trim();
+  const key = document.getElementById('cfg-key').value.trim();
+  if (!url || !key) return alert('Preencha URL e Key');
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  initSupabase(url, key);
+}
 
-  function initSupabase(url, key) {
-    try {
-      sb = supabase.createClient(url, key);
-      g('config-screen').style.display = 'none';
-      g('main-app').style.display = 'block';
-      renderTab();
-    } catch(e) {
-      alert('Erro ao conectar: ' + e.message);
-    }
-  }
-
-  // ── Helpers ──
-  function g(id) { return document.getElementById(id); }
-  function val(id) { return (g(id)||{}).value || ''; }
-  function fmtMoney(v) { return Number(v||0).toLocaleString('pt-BR', {minimumFractionDigits:2}); }
-  function vencendo(d) { if(!d) return false; return (new Date(d) - new Date()) / 864e5 < 60; }
-
-  function statusBadge(s) {
-    const m = {'Atenção!':'b-red','Proposta cadastrada':'b-green','Cadastrar proposta':'b-blue','Aguardando retorno PH/Mário':'b-amber','Aguardando retorno Rafael':'b-amber','Buscar novo edital':'b-purple','Edital não encontrado':'b-gray','Revenda':'b-teal','Continuidade':'b-teal'};
-    return `<span class="badge ${m[s]||'b-gray'}">${s||'—'}</span>`;
-  }
-  function finBadge(f) {
-    const c = {'OK':'b-green','SERASA':'b-red','SANDRA':'b-amber'};
-    return `<span class="badge ${c[f]||'b-gray'}">${f||'—'}</span>`;
-  }
-  function litBadge(l) {
-    return `<span class="badge ${l==='LINE'?'b-blue':'b-purple'}">${l||'—'}</span>`;
-  }
-  function showModal(html) { g('modal-root').innerHTML = `<div class="modal-bg" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">${html}</div></div>`; }
-  function closeModal() { g('modal-root').innerHTML = ''; }
-
-  // ── Company filter ──
-  function setCompany(c, el) {
-    companyFilter = c;
-    document.querySelectorAll('.filter-company button').forEach(b => b.classList.remove('active'));
-    el.classList.add('active');
+function initSupabase(url, key) {
+  try {
+    SB = supabase.createClient(url, key);
+    document.getElementById('config-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
     renderTab();
+  } catch(e) { alert('Erro ao conectar: ' + e.message); }
+}
+
+(function(){
+  const u = localStorage.getItem('sb_url'), k = localStorage.getItem('sb_key');
+  if (u && k) initSupabase(u, k);
+})();
+
+// ── Helpers ──
+function g(id) { return document.getElementById(id); }
+function val(id) { return (g(id)||{}).value || ''; }
+function fmtMoney(v) { return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function vencendo(d) {
+  if (!d) return false;
+  const diff = (new Date(d) - new Date()) / 864e5;
+  return diff < 60;
+}
+function diasRestantes(d) {
+  if (!d) return null;
+  return Math.ceil((new Date(d) - new Date()) / 864e5);
+}
+
+function statusBadge(s) {
+  const m = {'Atenção!':'b-red','Proposta cadastrada':'b-green','Cadastrar proposta':'b-blue','Aguardando retorno PH/Mário':'b-amber','Aguardando retorno Rafael':'b-amber','Buscar novo edital':'b-purple','Edital não encontrado':'b-gray','Revenda':'b-teal','Continuidade':'b-teal'};
+  return `<span class="badge ${m[s]||'b-gray'}">${esc(s||'—')}</span>`;
+}
+function finBadge(f) {
+  const c = {'OK':'b-green','SERASA':'b-red','SANDRA':'b-amber'};
+  return `<span class="badge ${c[f]||'b-gray'}">${esc(f||'—')}</span>`;
+}
+function litBadge(l) {
+  return `<span class="badge ${l==='LINE'?'b-blue':'b-purple'}">${esc(l||'—')}</span>`;
+}
+function showModal(html) { g('modal-root').innerHTML = `<div class="modal-bg" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()">${html}</div></div>`; }
+function closeModal() { g('modal-root').innerHTML = ''; }
+function setCompany(c, el) {
+  companyFilter = c;
+  document.querySelectorAll('.filter-company button').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderTab();
+}
+function switchTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTab();
+}
+function onBusca(tab, v) { buscas[tab] = v; renderTab(); }
+function onFiltro(k, v) { filtros[k] = v; renderTab(); }
+function toggleArquivados() { mostrarArquivados = !mostrarArquivados; renderTab(); }
+
+async function renderTab() {
+  g('tab-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  if (currentTab === 'pesquisa') await renderPesquisa();
+  else if (currentTab === 'resultado') await renderResultado();
+  else if (currentTab === 'saldo') await renderSaldo();
+  else await renderPedidos();
+}
+
+// ── PESQUISA ──
+async function renderPesquisa() {
+  let q = SB.from('pregoes').select('*').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data: todos, error } = await q;
+  if (error) { g('tab-content').innerHTML = `<div class="empty">Erro ao carregar: ${error.message}</div>`; return; }
+
+  const ativos = (todos||[]).filter(p => !p.encerrado && p.fase !== 'np' && p.fase !== 'arquivado');
+  const np = (todos||[]).filter(p => p.fase === 'np');
+  const arquivados = (todos||[]).filter(p => p.fase === 'arquivado');
+  const busca = buscas.pesquisa.toLowerCase();
+  const filUF = filtros.uf;
+  const filtrar = arr => arr.filter(p => (!busca || JSON.stringify(p).toLowerCase().includes(busca)) && (!filUF || p.uf === filUF));
+
+  let html = `<div class="toolbar">
+    <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.pesquisa)}" oninput="onBusca('pesquisa',this.value)">
+    <select onchange="onFiltro('uf',this.value)">
+      <option value="">Todos UF</option>${UF_OPTS.map(u=>`<option${filtros.uf===u?' selected':''}>${u}</option>`).join('')}
+    </select>
+    <button class="btn ghost" onclick="toggleArquivados()" style="font-size:12px">${mostrarArquivados?'🗂 Ocultar arquivados':'🗂 Mostrar arquivados'} (${arquivados.length})</button>
+  </div>`;
+
+  const lista = filtrar(ativos);
+  if (!lista.length) html += `<div class="empty" style="padding:24px">📭 Nenhum pregão em acompanhamento</div>`;
+  lista.forEach(p => { html += cardPregao(p); });
+
+  const npFilt = filtrar(np);
+  if (npFilt.length) {
+    html += `<div class="sec" style="margin-top:20px">Não participamos (${npFilt.length})</div>`;
+    npFilt.forEach(p => {
+      html += `<div class="card" style="opacity:.7">
+        <div class="card-header">
+          <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+          <span class="badge b-gray">Não participamos</span>${litBadge(p.licitante)}
+          <button class="btn sm" onclick="openEditPregao('${p.id}')">✏️ Editar</button>
+        </div>
+        <div class="card-meta"><span>📍 ${p.uf||'—'}</span><span>📅 ${p.data||'—'}</span>${p.motivo_nao?`<span>Motivo: ${esc(p.motivo_nao)}</span>`:''}</div>
+      </div>`;
+    });
   }
 
-  // ── Tab switching ──
-  function switchTab(tab, el) {
-    currentTab = tab;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    renderTab();
+  if (mostrarArquivados && arquivados.length) {
+    html += `<div class="sec" style="margin-top:20px">Arquivados (${arquivados.length})</div>`;
+    filtrar(arquivados).forEach(p => {
+      html += `<div class="card" style="opacity:.6;border-style:dashed">
+        <div class="card-header">
+          <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+          <span class="badge b-gray">📦 Arquivado</span>${litBadge(p.licitante)}
+          <button class="btn sm" onclick="openEditPregao('${p.id}')">✏️ Editar</button>
+        </div>
+        <div class="card-meta"><span>📍 ${p.uf||'—'}</span><span>📅 ${p.data||'—'}</span></div>
+      </div>`;
+    });
   }
 
-  async function renderTab() {
-    g('tab-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    if (currentTab === 'pesquisa') await renderPesquisa();
-    else if (currentTab === 'resultado') await renderResultado();
-    else if (currentTab === 'saldo') await renderSaldo();
-    else await renderPedidos();
-  }
+  g('tab-content').innerHTML = html;
+}
 
-  // ── Saldo calc ──
-  async function calcSaldo(pregaoId, itemId, qtdGanha) {
-    const { data } = await sb.from('pedido_itens')
-      .select('qtd, pedido:pedido_id(avulso, pregao_id)')
-      .eq('item_id', itemId);
-    const comprado = (data||[]).filter(r => !r.pedido?.avulso).reduce((a,r) => a + Number(r.qtd||0), 0);
-    return Math.max(0, Number(qtdGanha||0) - comprado);
-  }
-
-  // ── PESQUISA ──
-  async function renderPesquisa() {
-    let q = sb.from('pregoes').select('*').neq('fase','arquivado').order('created_at', {ascending:false});
-    if (companyFilter) q = q.eq('licitante', companyFilter);
-
-    const { data: todos } = await q;
-    const ativos = (todos||[]).filter(p => !p.encerrado && p.fase !== 'np');
-    const np = (todos||[]).filter(p => p.fase === 'np');
-    const busca = buscas.pesquisa.toLowerCase();
-    const filUF = filtros.uf;
-
-    const filtrar = arr => arr.filter(p =>
-      (!busca || JSON.stringify(p).toLowerCase().includes(busca)) &&
-      (!filUF || p.uf === filUF)
-    );
-
-    let html = `<div class="stats">
-      <div class="stat"><div class="stat-label">Em acompanhamento</div><div class="stat-value">${ativos.length}</div></div>
-      <div class="stat"><div class="stat-label">Não participamos</div><div class="stat-value">${np.length}</div></div>
+function cardPregao(p) {
+  return `<div class="card">
+  <div class="card-header">
+    <div class="card-title">${esc(p.pregao||'Pregão s/nº')} — ${esc(p.uasg||'UASG ?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      ${statusBadge(p.status)}${finBadge(p.financeiro)}${litBadge(p.licitante)}
+      <button class="btn sm" onclick="openEditPregao('${p.id}')">✏️</button>
+      <button class="btn sm primary" onclick="openEncerrar('${p.id}')">🏁 Encerrar</button>
     </div>
-    <div class="toolbar">
-      <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${buscas.pesquisa}" oninput="App.onBusca('pesquisa',this.value)">
-      <select onchange="App.onFiltro('uf',this.value)">
-        <option value="">Todos UF</option>${UF_OPTS.map(u=>`<option${filUF===u?' selected':''}>${u}</option>`).join('')}
-      </select>
-    </div>`;
+  </div>
+  <div class="card-meta">
+    <span>🏢 ${esc(p.licitante||'—')}</span><span>📍 ${p.uf||'—'}</span>
+    ${p.cliente?`<span>👤 ${esc(p.cliente)}</span>`:''}
+    <span>📅 ${p.data||'—'}</span>
+    ${p.prazo_entrega?`<span>🚚 ${esc(p.prazo_entrega)}</span>`:''}
+    ${p.bb?`<span>🔗 BB: ${esc(p.bb)}</span>`:''}
+    ${p.vendedor&&p.vendedor!=='Sem Vendedor'?`<span>💼 ${esc(p.vendedor)}</span>`:''}
+  </div>
+  <div class="tag-row">
+    ${p.esclarecimento?`<span class="badge b-amber">❓ Esclarecimento: ${esc(p.esclarecimento)}</span>`:''}
+    ${p.impugnacao?`<span class="badge b-red">⚠️ Impugnação: ${esc(p.impugnacao)}</span>`:''}
+  </div>
+  ${p.obs?`<div style="font-size:12px;color:var(--text2);margin-top:6px">${esc(p.obs)}</div>`:''}
+  </div>`;
+}
 
-    const lista = filtrar(ativos);
-    if (!lista.length) html += `<div class="empty"><div class="empty-icon">📭</div>Nenhum pregão em acompanhamento</div>`;
-    lista.forEach(p => { html += cardPregao(p); });
+// ── RESULTADO ──
+async function renderResultado() {
+  let q = SB.from('pregoes').select('*, itens(*)').eq('encerrado',true).neq('fase','arquivado').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data } = await q;
+  const busca = buscas.resultado.toLowerCase();
+  const lista = (data||[]).filter(p => !busca || JSON.stringify(p).toLowerCase().includes(busca));
 
-    const npFilt = filtrar(np);
-    if (npFilt.length) {
-      html += `<div class="sec" style="margin-top:20px">Não participamos (${npFilt.length})</div>`;
-      npFilt.forEach(p => {
-        html += `<div class="card" style="opacity:.7">
-          <div class="card-header">
-            <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
-            <span class="badge b-gray">Não participamos</span>
-            ${litBadge(p.licitante)}
-            <button class="btn sm" onclick="App.openEditPregao('${p.id}')">✏️ Editar</button>
-          </div>
-          <div class="card-meta"><span>📍 ${p.uf||'—'}</span><span>📅 ${p.data||'—'}</span>${p.motivo_nao?`<span>Motivo: ${esc(p.motivo_nao)}</span>`:''}</div>
-        </div>`;
-      });
-    }
+  let html = `<div class="toolbar"><input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.resultado)}" oninput="onBusca('resultado',this.value)"></div>`;
+  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">🏆 Nenhum pregão encerrado</div>`; return; }
 
-    g('tab-content').innerHTML = html;
-  }
-
-  function cardPregao(p) {
-    return `<div class="card">
+  lista.forEach(p => {
+    const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+    const perdidos = (p.itens||[]).filter(i=>i.resultado==='perdido');
+    html += `<div class="card">
     <div class="card-header">
-      <div class="card-title">${esc(p.pregao||'Pregão s/nº')} — ${esc(p.uasg||'UASG ?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        ${statusBadge(p.status)}${finBadge(p.financeiro)}${litBadge(p.licitante)}
-        <button class="btn sm" onclick="App.openEditPregao('${p.id}')">✏️</button>
-        <button class="btn sm primary" onclick="App.openEncerrar('${p.id}')">🏁 Encerrar</button>
+      <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${litBadge(p.licitante)}
+        ${ganhos.length?`<span class="badge b-green">${ganhos.length} ganho(s)</span>`:''}
+        ${perdidos.length?`<span class="badge b-red">${perdidos.length} perdido(s)</span>`:''}
+        <button class="btn sm" onclick="openItens('${p.id}')">📋 Itens</button>
       </div>
     </div>
     <div class="card-meta">
-      <span>🏢 ${p.licitante||'—'}</span>
-      <span>📍 ${p.uf||'—'}</span>
-      ${p.cliente?`<span>👤 ${esc(p.cliente)}</span>`:''}
-      <span>📅 ${p.data||'—'}</span>
-      ${p.prazo_entrega?`<span>🚚 Prazo: ${esc(p.prazo_entrega)}</span>`:''}
-      ${p.bb?`<span>🔗 BB: ${esc(p.bb)}</span>`:''}
-      ${p.vendedor&&p.vendedor!=='Sem Vendedor'?`<span>💼 ${esc(p.vendedor)}</span>`:''}
+      <span>📍 ${p.uf||'—'}</span><span>📅 ${p.data||'—'}</span>
+      ${p.prazo_entrega?`<span>🚚 ${esc(p.prazo_entrega)}</span>`:''}
+      ${p.validade_ata?`<span>📆 Ata até: <strong>${p.validade_ata}</strong></span>`:''}
     </div>
-    <div class="tag-row">
-      ${p.esclarecimento?`<span class="badge b-amber">❓ Esclarecimento: ${esc(p.esclarecimento)}</span>`:''}
-      ${p.impugnacao?`<span class="badge b-red">⚠️ Impugnação: ${esc(p.impugnacao)}</span>`:''}
-    </div>
-    ${p.obs?`<div style="font-size:12px;color:var(--text2);margin-top:6px">${esc(p.obs)}</div>`:''}
+    ${(p.itens||[]).map(it=>`<div class="item-row">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${esc(it.produto||'Produto')}</div>
+        <div style="font-size:11px;color:var(--text2)">
+          ${it.resultado==='ganho'
+            ?`Qtd: ${it.qtd_ganha||0} | R$ ${fmtMoney(it.valor_unit)}/un | Total: R$ ${fmtMoney((it.qtd_ganha||0)*(it.valor_unit||0))}`
+            :`Vencedor: ${esc(it.empresa_venc||'—')} | Qtd: ${it.qtd_venc||'—'} | R$ ${fmtMoney(it.valor_venc)} | Mín: R$ ${fmtMoney(it.valor_min)} | ${esc(it.motivo_perda||'—')}`}
+        </div>
+      </div>
+      <span class="badge ${it.resultado==='ganho'?'b-green':'b-red'}">${it.resultado==='ganho'?'Ganho':'Perdido'}</span>
+    </div>`).join('')}
     </div>`;
-  }
+  });
+  g('tab-content').innerHTML = html;
+}
 
-  // ── RESULTADO ──
-  async function renderResultado() {
-    let q = sb.from('pregoes').select('*, itens(*)').eq('encerrado', true).neq('fase','arquivado').order('created_at',{ascending:false});
-    if (companyFilter) q = q.eq('licitante', companyFilter);
-    const { data } = await q;
-    const busca = buscas.resultado.toLowerCase();
-    const lista = (data||[]).filter(p => !busca || JSON.stringify(p).toLowerCase().includes(busca));
+// ── SALDO ──
+async function renderSaldo() {
+  let q = SB.from('pregoes').select('*, itens(*), pedidos(*, pedido_itens(*))').eq('encerrado',true).neq('fase','arquivado').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data } = await q;
+  const busca = buscas.saldo.toLowerCase();
+  const lista = (data||[]).filter(p => (p.itens||[]).some(i=>i.resultado==='ganho') && (!busca || JSON.stringify(p).toLowerCase().includes(busca)));
 
-    let html = `<div class="toolbar"><input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${buscas.resultado}" oninput="App.onBusca('resultado',this.value)"></div>`;
-    if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty"><div class="empty-icon">🏆</div>Nenhum pregão encerrado</div>`; return; }
+  let html = `<div class="toolbar"><input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.saldo)}" oninput="onBusca('saldo',this.value)"></div>`;
+  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">📦 Nenhum contrato ativo</div>`; return; }
 
-    lista.forEach(p => {
-      const ganhos = (p.itens||[]).filter(i => i.resultado==='ganho');
-      const perdidos = (p.itens||[]).filter(i => i.resultado==='perdido');
-      html += `<div class="card">
-      <div class="card-header">
-        <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          ${litBadge(p.licitante)}
-          ${ganhos.length?`<span class="badge b-green">${ganhos.length} ganho(s)</span>`:''}
-          ${perdidos.length?`<span class="badge b-red">${perdidos.length} perdido(s)</span>`:''}
-          <button class="btn sm" onclick="App.openItens('${p.id}')">📋 Itens</button>
-        </div>
-      </div>
-      <div class="card-meta">
-        <span>📍 ${p.uf||'—'}</span><span>📅 ${p.data||'—'}</span>
-        ${p.prazo_entrega?`<span>🚚 Prazo: ${esc(p.prazo_entrega)}</span>`:''}
-        ${p.validade_ata?`<span>📆 Ata até: <strong>${p.validade_ata}</strong></span>`:''}
-      </div>
-      ${(p.itens||[]).map(it=>`<div class="item-row">
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:600">${esc(it.produto||'Produto')}</div>
-          <div style="font-size:11px;color:var(--text2)">
-            ${it.resultado==='ganho'
-              ?`Qtd: ${it.qtd_ganha||0} | R$ ${fmtMoney(it.valor_unit)}/un | Total: R$ ${fmtMoney((it.qtd_ganha||0)*(it.valor_unit||0))}`
-              :`Vencedor: ${esc(it.empresa_venc||'—')} | Qtd: ${it.qtd_venc||'—'} | R$ ${fmtMoney(it.valor_venc)} | Mín: R$ ${fmtMoney(it.valor_min)} | ${esc(it.motivo_perda||'—')}`}
-          </div>
-        </div>
-        <span class="badge ${it.resultado==='ganho'?'b-green':'b-red'}">${it.resultado==='ganho'?'Ganho':'Perdido'}</span>
-      </div>`).join('')}
-      </div>`;
-    });
-    g('tab-content').innerHTML = html;
-  }
+  lista.forEach(p => {
+    const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+    const rps = p.pedidos||[];
+    const dias = diasRestantes(p.validade_ata);
+    const ataAlert = p.validade_ata && dias !== null && dias < 60
+      ? `<div class="alert-ata">⚠️ ${dias <= 0 ? 'Ata VENCIDA!' : `Ata vence em ${dias} dia(s) — ${p.validade_ata}`}</div>` : '';
 
-  // ── SALDO ──
-  async function renderSaldo() {
-    let q = sb.from('pregoes').select('*, itens(*), pedidos(*, pedido_itens(*))').eq('encerrado', true).neq('fase','arquivado').order('created_at',{ascending:false});
-    if (companyFilter) q = q.eq('licitante', companyFilter);
-    const { data } = await q;
-    const busca = buscas.saldo.toLowerCase();
-    const lista = (data||[]).filter(p =>
-      (p.itens||[]).some(i=>i.resultado==='ganho') &&
-      (!busca || JSON.stringify(p).toLowerCase().includes(busca))
-    );
+    const itensHtml = ganhos.map(it => {
+      const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
+        const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
+        return a+(ri?Number(ri.qtd||0):0);
+      },0);
+      const saldo = Math.max(0, Number(it.qtd_ganha||0)-comprado);
+      const pct = Number(it.qtd_ganha)>0?Math.max(0,Math.round(saldo/Number(it.qtd_ganha)*100)):0;
+      return `<div class="item-row"><div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${esc(it.produto||'Produto')}</div>
+        <div style="font-size:11px;color:var(--text2)">Ganho: ${it.qtd_ganha||0} | Comprado: ${comprado} | <strong>Saldo: ${saldo}</strong> | R$ ${fmtMoney(it.valor_unit)}/un | Valor saldo: R$ ${fmtMoney(saldo*(it.valor_unit||0))}</div>
+        <div class="saldo-bar"><div class="saldo-fill" style="width:${pct}%"></div></div>
+      </div></div>`;
+    }).join('');
 
-    let html = `<div class="toolbar"><input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${buscas.saldo}" oninput="App.onBusca('saldo',this.value)"></div>`;
-    if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty"><div class="empty-icon">📦</div>Nenhum contrato ativo</div>`; return; }
-
-    lista.forEach(p => {
-      const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
-      const rps = p.pedidos||[];
-
-      const itensHtml = ganhos.map(it => {
-        const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
-          const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
-          return a+(ri?Number(ri.qtd||0):0);
-        },0);
-        const saldo = Math.max(0, Number(it.qtd_ganha||0)-comprado);
-        const pct = Number(it.qtd_ganha)>0?Math.max(0,Math.round(saldo/Number(it.qtd_ganha)*100)):0;
-        return `<div class="item-row"><div style="flex:1">
-          <div style="font-size:13px;font-weight:600">${esc(it.produto||'Produto')}</div>
-          <div style="font-size:11px;color:var(--text2)">Ganho: ${it.qtd_ganha||0} | Comprado: ${comprado} | <strong>Saldo: ${saldo}</strong> | R$ ${fmtMoney(it.valor_unit)}/un | Valor saldo: R$ ${fmtMoney(saldo*(it.valor_unit||0))}</div>
-          <div class="saldo-bar"><div class="saldo-fill" style="width:${pct}%"></div></div>
-        </div></div>`;
-      }).join('');
-
-      const rpsHtml = rps.length ? `<div class="sec" style="margin-top:10px">RPs (${rps.length})</div>
-        ${rps.map(rp=>`<div class="rp-line">
-          <strong>${esc(rp.numero||'—')}</strong>
-          ${rp.avulso?`<span class="badge b-coral">Adesão</span>`:''}
-          <span style="color:var(--text2)">${esc(rp.avulso?(rp.cliente_aderente||rp.cliente||'—'):(rp.cliente||'—'))}</span>
-          <span style="flex:1">${(rp.pedido_itens||[]).map(i=>`${esc(i.produto||'')}: ${i.qtd}`).join(', ')}</span>
-          <span>R$ ${fmtMoney(rp.valor_total)}</span>
-          ${rp.entrega?`<span style="color:var(--text2)">${rp.entrega}</span>`:''}
-          <button class="btn sm danger" onclick="App.deleteRP('${rp.id}')">🗑</button>
-        </div>`).join('')}` : '';
-
-      html += `<div class="card">
-      <div class="card-header">
-        <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          ${litBadge(p.licitante)}
-          <button class="btn sm primary" onclick="App.openRP('${p.id}')">+ RP</button>
-        </div>
-      </div>
-      <div class="card-meta">
-        <span>📍 ${p.uf||'—'}</span>
-        ${p.prazo_entrega?`<span>🚚 Prazo: ${esc(p.prazo_entrega)}</span>`:''}
-        ${p.validade_ata
-          ?`<span style="color:${vencendo(p.validade_ata)?'var(--red-fg)':'inherit'}">📆 Ata: <strong>${p.validade_ata}</strong>${vencendo(p.validade_ata)?' ⚠️':''}</span>`
-          :`<span style="color:var(--red-fg)">⚠️ Validade não informada</span>`}
-      </div>
-      ${itensHtml}${rpsHtml}
-      </div>`;
-    });
-    g('tab-content').innerHTML = html;
-  }
-
-  // ── PEDIDOS ──
-  async function renderPedidos() {
-    let q = sb.from('pedidos').select('*, pregao:pregao_id(pregao,uasg,cliente,uf), pedido_itens(*)').order('created_at',{ascending:false});
-    if (companyFilter) q = q.eq('licitante', companyFilter);
-    const { data } = await q;
-    const busca = buscas.pedidos.toLowerCase();
-    const lista = (data||[]).filter(r => !busca || JSON.stringify(r).toLowerCase().includes(busca));
-
-    let html = `<div class="toolbar"><input type="text" placeholder="Buscar RP, cliente, pregão..." value="${buscas.pedidos}" oninput="App.onBusca('pedidos',this.value)"></div>`;
-    if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty"><div class="empty-icon">🛒</div>Nenhum pedido registrado</div>`; return; }
-
-    lista.forEach(rp => {
-      const p = rp.pregao||{};
-      html += `<div class="card">
-      <div class="card-header">
-        <div class="card-title">RP ${esc(rp.numero||'—')} — ${esc(rp.avulso?(rp.cliente_aderente||rp.cliente||'—'):(rp.cliente||p.cliente||'—'))}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          ${litBadge(rp.licitante)}
-          ${rp.avulso?`<span class="badge b-coral">Adesão de ata</span>`:''}
-          ${rp.rp_repasse?`<span class="badge b-teal">Repasse: ${esc(rp.rp_repasse)}</span>`:''}
-          <button class="btn sm danger" onclick="App.deleteRP('${rp.id}')">🗑 Excluir</button>
-        </div>
-      </div>
-      <div class="card-meta">
-        <span>📍 ${esc(rp.avulso?(rp.uf_aderente||rp.uf||'—'):(rp.uf||p.uf||'—'))}</span>
-        <span>Pregão: ${esc(p.pregao||'—')}</span>
-        ${rp.avulso&&p.cliente?`<span style="color:var(--text2)">Ata original: ${esc(p.cliente)}</span>`:''}
+    const rpsHtml = rps.length ? `<div class="sec" style="margin-top:10px">RPs (${rps.length})</div>
+      ${rps.map(rp=>`<div class="rp-line">
+        <strong>${esc(rp.numero||'—')}</strong>
+        ${rp.avulso?`<span class="badge b-coral">Adesão</span>`:''}
+        <span style="color:var(--text2)">${esc(rp.avulso?(rp.cliente_aderente||rp.cliente||'—'):(rp.cliente||'—'))}</span>
+        <span style="flex:1">${(rp.pedido_itens||[]).map(i=>`${esc(i.produto||'')}: ${i.qtd}`).join(', ')}</span>
         <span>R$ ${fmtMoney(rp.valor_total)}</span>
-        ${rp.entrega?`<span>Entrega: ${rp.entrega}</span>`:''}
-        ${rp.prorrogacao?`<span>Prorrogação: ${rp.prorrogacao}</span>`:''}
+        ${rp.entrega?`<span style="color:var(--text2)">${rp.entrega}</span>`:''}
+        <button class="btn sm danger" onclick="deleteRP('${rp.id}')">🗑</button>
+      </div>`).join('')}` : '';
+
+    html += `<div class="card">
+    <div class="card-header">
+      <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${litBadge(p.licitante)}
+        <button class="btn sm primary" onclick="openRP('${p.id}')">+ RP</button>
       </div>
-      <div class="tag-row">${(rp.pedido_itens||[]).map(i=>`<span class="badge b-gray">${esc(i.produto||'')}: ${i.qtd}</span>`).join('')}</div>
-      ${rp.obs_sup?`<div style="font-size:12px;color:var(--text2);margin-top:4px">Suprimentos: ${esc(rp.obs_sup)}</div>`:''}
-      ${rp.obs_lic?`<div style="font-size:12px;color:var(--text2)">Licitação: ${esc(rp.obs_lic)}</div>`:''}
-      </div>`;
-    });
-    g('tab-content').innerHTML = html;
-  }
-
-  // ── FORM HELPERS ──
-  function pregaoFormFields(p) {
-    p = p||{};
-    return `
-    <div class="row">
-      <div class="field"><label>Licitante</label><select id="f-lit">${LICITANTES.map(l=>`<option${p.licitante===l?' selected':''}>${l}</option>`).join('')}</select></div>
-      <div class="field"><label>UF</label><select id="f-uf">${UF_OPTS.map(u=>`<option${p.uf===u?' selected':''}>${u}</option>`).join('')}</select></div>
-      <div class="field"><label>Vendedor</label><select id="f-vend">${VENDEDORES.map(v=>`<option${p.vendedor===v?' selected':''}>${v}</option>`).join('')}</select></div>
     </div>
-    <div class="row">
-      <div class="field"><label>Nº Pregão</label><input id="f-pregao" value="${esc(p.pregao||'')}" placeholder="Pregão 123/2025"></div>
-      <div class="field"><label>UASG</label><input id="f-uasg" value="${esc(p.uasg||'')}" placeholder="123456"></div>
-      <div class="field"><label>BB</label><input id="f-bb" value="${esc(p.bb||'')}" placeholder="nº ou link"></div>
+    <div class="card-meta">
+      <span>📍 ${p.uf||'—'}</span>
+      ${p.prazo_entrega?`<span>🚚 ${esc(p.prazo_entrega)}</span>`:''}
+      ${p.validade_ata
+        ?`<span style="color:${dias!==null&&dias<60?'var(--red-fg)':'inherit'}">📆 Ata: <strong>${p.validade_ata}</strong>${dias!==null&&dias<60?' ⚠️':''}</span>`
+        :`<span style="color:var(--red-fg)">⚠️ Validade não informada</span>`}
     </div>
-    <div class="row">
-      <div class="field"><label>Cliente</label><input id="f-cliente" value="${esc(p.cliente||'')}" placeholder="Nome do cliente/órgão"></div>
-      <div class="field" style="flex:0 0 150px"><label>Data pregão</label><input type="date" id="f-data" value="${p.data||''}"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>Site</label><input id="f-site" value="${esc(p.site||'')}" placeholder="URL ou sistema"></div>
-      <div class="field"><label>Prazo de entrega</label><input id="f-prazo" value="${esc(p.prazo_entrega||'')}" placeholder="Ex: 30 dias corridos"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>Status</label><select id="f-status">${STATUS_OPTS.map(s=>`<option${p.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
-      <div class="field" style="flex:0 0 130px"><label>Financeiro</label><select id="f-fin">${FIN_OPTS.map(f=>`<option${p.financeiro===f?' selected':''}>${f}</option>`).join('')}</select></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>Esclarecimento</label><input id="f-escl" value="${esc(p.esclarecimento||'')}" placeholder="Data ou descrição"></div>
-      <div class="field"><label>Impugnação</label><input id="f-imp" value="${esc(p.impugnacao||'')}" placeholder="Data ou descrição"></div>
-    </div>
-    <div class="row"><div class="field"><label>Obs.</label><textarea id="f-obs">${esc(p.obs||'')}</textarea></div></div>`;
-  }
-
-  function pregaoFromForm(extra) {
-    return Object.assign({
-      licitante:val('f-lit'), uf:val('f-uf'), vendedor:val('f-vend'),
-      pregao:val('f-pregao'), uasg:val('f-uasg'), bb:val('f-bb'),
-      cliente:val('f-cliente'), data:val('f-data')||null,
-      site:val('f-site'), prazo_entrega:val('f-prazo'),
-      status:val('f-status'), financeiro:val('f-fin'),
-      esclarecimento:val('f-escl'), impugnacao:val('f-imp'), obs:val('f-obs')
-    }, extra||{});
-  }
-
-  // ── PREGAO CRUD ──
-  function openNewPregao() {
-    showModal(`<h2>Novo pregão</h2>${pregaoFormFields()}
-    <div class="modal-footer">
-      <button class="btn" onclick="App.closeModal()">Cancelar</button>
-      <button class="btn primary" onclick="App.saveNewPregao()">Salvar</button>
-    </div>`);
-  }
-
-  async function saveNewPregao() {
-    const btn = event.target; btn.disabled = true;
-    const { error } = await sb.from('pregoes').insert(pregaoFromForm({encerrado:false}));
-    btn.disabled = false;
-    if (error) return alert('Erro: '+error.message);
-    closeModal(); renderTab();
-  }
-
-  async function openEditPregao(id) {
-    const { data } = await sb.from('pregoes').select('*').eq('id',id).single();
-    if (!data) return;
-    showModal(`<h2>Editar pregão</h2>${pregaoFormFields(data)}
-    <div class="modal-footer">
-      <div class="modal-footer-left">
-        <button class="btn danger" onclick="App.archivePregao('${id}')">📦 Arquivar</button>
-        <button class="btn danger" onclick="App.deletePregao('${id}')">🗑 Excluir</button>
-      </div>
-      <button class="btn" onclick="App.closeModal()">Cancelar</button>
-      <button class="btn primary" onclick="App.saveEditPregao('${id}')">Salvar</button>
-    </div>`);
-  }
-
-  async function saveEditPregao(id) {
-    const btn = event.target; btn.disabled = true;
-    const { error } = await sb.from('pregoes').update(pregaoFromForm()).eq('id',id);
-    btn.disabled = false;
-    if (error) return alert('Erro: '+error.message);
-    closeModal(); renderTab();
-  }
-
-  async function archivePregao(id) {
-    if (!confirm('Arquivar este pregão? Ele ficará oculto mas os dados serão mantidos.')) return;
-    await sb.from('pregoes').update({fase:'arquivado'}).eq('id',id);
-    closeModal(); renderTab();
-  }
-
-  async function deletePregao(id) {
-    if (!confirm('EXCLUIR permanentemente este pregão e todos os seus itens e pedidos? Esta ação não pode ser desfeita.')) return;
-    await sb.from('pregoes').delete().eq('id',id);
-    closeModal(); renderTab();
-  }
-
-  // ── ENCERRAR ──
-  function openEncerrar(id) {
-    showModal(`<h2>Encerrar pregão</h2>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">O pregão irá para Resultados. Adicione os itens ganhos e perdidos a seguir.</p>
-    <div class="field"><label>Validade da ata / contrato</label><input type="date" id="f-validade"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="App.closeModal()">Cancelar</button>
-      <button class="btn primary" onclick="App.confirmarEncerrar('${id}')">Encerrar e registrar itens</button>
-    </div>`);
-  }
-
-  async function confirmarEncerrar(id) {
-    const btn = event.target; btn.disabled = true;
-    await sb.from('pregoes').update({encerrado:true, validade_ata:val('f-validade')||null}).eq('id',id);
-    btn.disabled = false;
-    closeModal();
-    setTimeout(() => openItens(id), 80);
-  }
-
-  // ── ITENS ──
-  async function openItens(id) {
-    const { data: p } = await sb.from('pregoes').select('*').eq('id',id).single();
-    const { data: itens } = await sb.from('itens').select('*').eq('pregao_id',id);
-    editingItens = JSON.parse(JSON.stringify(itens||[]));
-    renderItensModal(id, p);
-  }
-
-  function renderItensModal(id, p) {
-    const itHtml = editingItens.length ? editingItens.map((it,idx) => {
-      let extra = '';
-      if (it.resultado === 'ganho') {
-        extra = `<div class="row" style="margin-top:8px">
-          <div class="field"><label>Qtd ganha</label><input type="number" value="${it.qtd_ganha||''}" onchange="editingItens[${idx}].qtd_ganha=Number(this.value)"></div>
-          <div class="field"><label>Valor unitário (R$)</label><input type="number" step="0.01" value="${it.valor_unit||''}" onchange="editingItens[${idx}].valor_unit=Number(this.value)"></div>
-        </div>`;
-      } else if (it.resultado === 'perdido') {
-        extra = `<div class="row" style="margin-top:8px">
-          <div class="field"><label>Empresa vencedora</label><input value="${esc(it.empresa_venc||'')}" onchange="editingItens[${idx}].empresa_venc=this.value"></div>
-          <div class="field"><label>Quantidade</label><input type="number" value="${it.qtd_venc||''}" onchange="editingItens[${idx}].qtd_venc=Number(this.value)"></div>
-        </div>
-        <div class="row" style="margin-top:6px">
-          <div class="field"><label>Valor vencedor (R$)</label><input type="number" step="0.01" value="${it.valor_venc||''}" onchange="editingItens[${idx}].valor_venc=Number(this.value)"></div>
-          <div class="field"><label>Valor mínimo (R$)</label><input type="number" step="0.01" value="${it.valor_min||''}" onchange="editingItens[${idx}].valor_min=Number(this.value)"></div>
-          <div class="field"><label>Motivo da perda</label><select onchange="editingItens[${idx}].motivo_perda=this.value">
-            <option value="">— selecione —</option>
-            ${MOTIVOS_PERDA.map(m=>`<option${it.motivo_perda===m?' selected':''}>${m}</option>`).join('')}
-          </select></div>
-        </div>`;
-      }
-      return `<div class="item-block">
-      <div class="row">
-        <div class="field"><label>Produto</label><input value="${esc(it.produto||'')}" onchange="editingItens[${idx}].produto=this.value"></div>
-        <div class="field" style="flex:0 0 150px"><label>Resultado</label>
-          <select onchange="editingItens[${idx}].resultado=this.value;App.reRenderItens('${id}',null)">
-            <option value=""${!it.resultado?' selected':''}>— selecione —</option>
-            <option value="ganho"${it.resultado==='ganho'?' selected':''}>Ganho</option>
-            <option value="perdido"${it.resultado==='perdido'?' selected':''}>Perdido</option>
-          </select>
-        </div>
-        <button class="btn sm danger" style="margin-top:20px" onclick="editingItens.splice(${idx},1);App.reRenderItens('${id}',null)">🗑</button>
-      </div>${extra}</div>`;
-    }).join('') : `<div class="empty" style="padding:16px">Nenhum item adicionado</div>`;
-
-    showModal(`<h2>Itens — ${esc(p?.pregao||'s/nº')}${p?.cliente?` | ${esc(p.cliente)}`:''}</h2>
-    <div class="row" style="margin-bottom:14px">
-      <div class="field"><label>Validade ata/contrato</label><input type="date" id="f-validade" value="${p?.validade_ata||''}"></div>
-      <div class="field"><label>Prazo de entrega</label><input id="f-prazo-it" value="${esc(p?.prazo_entrega||'')}" placeholder="Ex: 30 dias corridos"></div>
-    </div>
-    <div id="itens-list">${itHtml}</div>
-    <button class="btn" style="margin-top:8px" onclick="editingItens.push({produto:'',resultado:''});App.reRenderItens('${id}',null)">+ Adicionar item</button>
-    <div class="modal-footer">
-      <button class="btn" onclick="App.closeModal()">Cancelar</button>
-      <button class="btn primary" onclick="App.saveItens('${id}')">Salvar itens</button>
-    </div>`);
-
-    // restore p reference for rerender
-    window._itensP = p;
-  }
-
-  function reRenderItens(id) {
-    const vl = val('f-validade'), pr = val('f-prazo-it');
-    const p = { ...window._itensP, validade_ata: vl, prazo_entrega: pr };
-    renderItensModal(id, p);
-    setTimeout(() => {
-      if (g('f-validade')) g('f-validade').value = vl;
-      if (g('f-prazo-it')) g('f-prazo-it').value = pr;
-    }, 0);
-  }
-
-  async function saveItens(id) {
-    const btn = event.target; btn.disabled = true;
-    await sb.from('pregoes').update({
-      validade_ata: val('f-validade')||null,
-      prazo_entrega: val('f-prazo-it')
-    }).eq('id',id);
-
-    // delete existing items and reinsert
-    await sb.from('itens').delete().eq('pregao_id',id);
-    const toInsert = editingItens.filter(it=>it.produto).map(it => ({
-      pregao_id: id,
-      produto: it.produto,
-      resultado: it.resultado,
-      qtd_ganha: it.qtd_ganha||null,
-      valor_unit: it.valor_unit||null,
-      empresa_venc: it.empresa_venc||null,
-      qtd_venc: it.qtd_venc||null,
-      valor_venc: it.valor_venc||null,
-      valor_min: it.valor_min||null,
-      motivo_perda: it.motivo_perda||null
-    }));
-    if (toInsert.length) await sb.from('itens').insert(toInsert);
-    btn.disabled = false;
-    closeModal(); renderTab();
-  }
-
-  // ── RP ──
-  async function openRP(pid) {
-    const { data: p } = await sb.from('pregoes').select('*, itens(*)').eq('id',pid).single();
-    avulsoItens = [{produto:'',qtd:0,valor_unit:0}];
-    window._rpPregao = p;
-    renderRPModal(pid, 'vinculado');
-  }
-
-  function renderRPModal(pid, modo) {
-    const p = window._rpPregao;
-    if (!p) return;
-    const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
-    const isAv = modo === 'avulso';
-
-    const origemBox = `<div class="info-box"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Pregão de origem</div>
-      <div class="ib-row">
-        <div class="ib-item"><div class="ib-label">Cliente original</div><div class="ib-value">${esc(p.cliente||'—')}</div></div>
-        <div class="ib-item"><div class="ib-label">UF</div><div class="ib-value">${p.uf||'—'}</div></div>
-        <div class="ib-item"><div class="ib-label">UASG</div><div class="ib-value">${esc(p.uasg||'—')}</div></div>
-        <div class="ib-item"><div class="ib-label">Licitante</div><div class="ib-value">${p.licitante||'—'}</div></div>
-        <div class="ib-item"><div class="ib-label">Prazo entrega</div><div class="ib-value">${esc(p.prazo_entrega||'—')}</div></div>
-      </div>
+    ${ataAlert}${itensHtml}${rpsHtml}
     </div>`;
+  });
+  g('tab-content').innerHTML = html;
+}
 
-    const clienteAderente = isAv ? `<div class="divider-label">Cliente aderente</div>
-      <div class="row" style="margin-bottom:10px">
-        <div class="field"><label>Cliente aderente</label><input id="rp-cli-ad" placeholder="Nome do cliente que está aderindo"></div>
-        <div class="field" style="flex:0 0 80px"><label>UF</label><select id="rp-uf-ad">${UF_OPTS.map(u=>`<option>${u}</option>`).join('')}</select></div>
-      </div>` : '';
+// ── PEDIDOS ──
+async function renderPedidos() {
+  let q = SB.from('pedidos').select('*, pregao:pregao_id(pregao,uasg,cliente,uf), pedido_itens(*)').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data } = await q;
+  const busca = buscas.pedidos.toLowerCase();
+  const lista = (data||[]).filter(r => !busca || JSON.stringify(r).toLowerCase().includes(busca));
 
-    const itInputs = isAv
-      ? avulsoItens.map((it,idx)=>`<div class="item-block" style="margin-top:6px">
-          <div class="row">
-            <div class="field"><label>Produto</label><input value="${esc(it.produto||'')}" onchange="avulsoItens[${idx}].produto=this.value"></div>
-            <div class="field" style="flex:0 0 80px"><label>Qtd</label><input type="number" min="0" value="${it.qtd||0}" oninput="avulsoItens[${idx}].qtd=Number(this.value);App.recalcRP('${modo}')"></div>
-            <div class="field" style="flex:0 0 120px"><label>Valor unit. (R$)</label><input type="number" step="0.01" value="${it.valor_unit||0}" oninput="avulsoItens[${idx}].valor_unit=Number(this.value);App.recalcRP('${modo}')"></div>
-            <button class="btn sm danger" style="margin-top:20px" onclick="avulsoItens.splice(${idx},1);App.renderRPModal('${pid}','${modo}')">🗑</button>
-          </div>
-        </div>`).join('')
-      : ganhos.length
-        ? ganhos.map(it=>{
-            const saldo = Math.max(0, Number(it.qtd_ganha||0)); // simplified — recalc on save
-            return `<div class="row" style="margin-top:6px;align-items:center">
-              <span style="flex:1;font-size:13px">${esc(it.produto||'Produto')} <span style="color:var(--text2)">(R$ ${fmtMoney(it.valor_unit)}/un)</span></span>
-              <div class="field" style="flex:0 0 90px;margin:0"><label>Qtd</label><input type="number" id="rp-q-${it.id}" min="0" value="0" oninput="App.recalcRP('${modo}')"></div>
-            </div>`;
-          }).join('')
-        : `<p style="font-size:13px;color:var(--text2)">Nenhum item ganho neste pregão</p>`;
+  let html = `<div class="toolbar"><input type="text" placeholder="Buscar RP, cliente, pregão..." value="${esc(buscas.pedidos)}" oninput="onBusca('pedidos',this.value)"></div>`;
+  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">🛒 Nenhum pedido registrado</div>`; return; }
 
-    showModal(`<h2>Novo RP — ${esc(p.pregao||'s/nº')}</h2>
-    <div class="toggle-row">
-      <div class="toggle-opt${!isAv?' active':''}" onclick="App.renderRPModal('${pid}','vinculado')">Vinculado ao saldo</div>
-      <div class="toggle-opt${isAv?' active':''}" onclick="App.renderRPModal('${pid}','avulso')">Adesão de ata</div>
+  lista.forEach(rp => {
+    const p = rp.pregao||{};
+    html += `<div class="card">
+    <div class="card-header">
+      <div class="card-title">RP ${esc(rp.numero||'—')} — ${esc(rp.avulso?(rp.cliente_aderente||rp.cliente||'—'):(rp.cliente||p.cliente||'—'))}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${litBadge(rp.licitante)}
+        ${rp.avulso?`<span class="badge b-coral">Adesão de ata</span>`:''}
+        ${rp.rp_repasse?`<span class="badge b-teal">Repasse: ${esc(rp.rp_repasse)}</span>`:''}
+        <button class="btn sm danger" onclick="deleteRP('${rp.id}')">🗑 Excluir</button>
+      </div>
     </div>
-    ${origemBox}${clienteAderente}
+    <div class="card-meta">
+      <span>📍 ${esc(rp.avulso?(rp.uf_aderente||rp.uf||'—'):(rp.uf||p.uf||'—'))}</span>
+      <span>Pregão: ${esc(p.pregao||'—')}</span>
+      ${rp.avulso&&p.cliente?`<span style="color:var(--text2)">Ata original: ${esc(p.cliente)}</span>`:''}
+      <span>R$ ${fmtMoney(rp.valor_total)}</span>
+      ${rp.entrega?`<span>Entrega: ${rp.entrega}</span>`:''}
+      ${rp.prorrogacao?`<span>Prorrogação: ${rp.prorrogacao}</span>`:''}
+    </div>
+    <div class="tag-row">${(rp.pedido_itens||[]).map(i=>`<span class="badge b-gray">${esc(i.produto||'')}: ${i.qtd}</span>`).join('')}</div>
+    ${rp.obs_sup?`<div style="font-size:12px;color:var(--text2);margin-top:4px">Suprimentos: ${esc(rp.obs_sup)}</div>`:''}
+    ${rp.obs_lic?`<div style="font-size:12px;color:var(--text2)">Licitação: ${esc(rp.obs_lic)}</div>`:''}
+    </div>`;
+  });
+  g('tab-content').innerHTML = html;
+}
+
+// ── PREGAO FORM ──
+function pregaoFormFields(p) {
+  p = p||{};
+  return `
+  <div class="row">
+    <div class="field"><label>Licitante</label><select id="f-lit">${LICITANTES.map(l=>`<option${p.licitante===l?' selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label>UF</label><select id="f-uf">${UF_OPTS.map(u=>`<option${p.uf===u?' selected':''}>${u}</option>`).join('')}</select></div>
+    <div class="field"><label>Vendedor</label><select id="f-vend">${VENDEDORES.map(v=>`<option${p.vendedor===v?' selected':''}>${v}</option>`).join('')}</select></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Nº Pregão</label><input id="f-pregao" value="${esc(p.pregao||'')}" placeholder="Pregão 123/2025"></div>
+    <div class="field"><label>UASG</label><input id="f-uasg" value="${esc(p.uasg||'')}" placeholder="123456"></div>
+    <div class="field"><label>BB</label><input id="f-bb" value="${esc(p.bb||'')}" placeholder="nº ou link"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Cliente</label><input id="f-cliente" value="${esc(p.cliente||'')}" placeholder="Nome do cliente/órgão"></div>
+    <div class="field" style="flex:0 0 150px"><label>Data pregão</label><input type="date" id="f-data" value="${p.data||''}"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Site</label><input id="f-site" value="${esc(p.site||'')}" placeholder="URL ou sistema"></div>
+    <div class="field"><label>Prazo de entrega</label><input id="f-prazo" value="${esc(p.prazo_entrega||'')}" placeholder="Ex: 30 dias corridos"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Status</label><select id="f-status">${STATUS_OPTS.map(s=>`<option${p.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field" style="flex:0 0 130px"><label>Financeiro</label><select id="f-fin">${FIN_OPTS.map(f=>`<option${p.financeiro===f?' selected':''}>${f}</option>`).join('')}</select></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Esclarecimento</label><input id="f-escl" value="${esc(p.esclarecimento||'')}" placeholder="Data ou descrição"></div>
+    <div class="field"><label>Impugnação</label><input id="f-imp" value="${esc(p.impugnacao||'')}" placeholder="Data ou descrição"></div>
+  </div>
+  <div class="row"><div class="field"><label>Obs.</label><textarea id="f-obs">${esc(p.obs||'')}</textarea></div></div>`;
+}
+
+function pregaoFromForm(extra) {
+  return Object.assign({
+    licitante:val('f-lit'), uf:val('f-uf'), vendedor:val('f-vend'),
+    pregao:val('f-pregao'), uasg:val('f-uasg'), bb:val('f-bb'),
+    cliente:val('f-cliente'), data:val('f-data')||null,
+    site:val('f-site'), prazo_entrega:val('f-prazo'),
+    status:val('f-status'), financeiro:val('f-fin'),
+    esclarecimento:val('f-escl'), impugnacao:val('f-imp'), obs:val('f-obs')
+  }, extra||{});
+}
+
+// ── CRUD PREGAO ──
+function openNewPregao() {
+  showModal(`<h2>Novo pregão</h2>${pregaoFormFields()}
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal()">Cancelar</button>
+    <button class="btn primary" onclick="saveNewPregao(this)">Salvar</button>
+  </div>`);
+}
+async function saveNewPregao(btn) {
+  btn.disabled = true;
+  const { error } = await SB.from('pregoes').insert(pregaoFromForm({encerrado:false}));
+  btn.disabled = false;
+  if (error) return alert('Erro: '+error.message);
+  closeModal(); renderTab();
+}
+
+async function openEditPregao(id) {
+  const { data } = await SB.from('pregoes').select('*').eq('id',id).single();
+  if (!data) return;
+  showModal(`<h2>Editar pregão</h2>${pregaoFormFields(data)}
+  <div class="modal-footer">
+    <div class="modal-footer-left">
+      <button class="btn danger" onclick="archivePregao('${id}')">📦 Arquivar</button>
+      <button class="btn danger" onclick="deletePregao('${id}')">🗑 Excluir</button>
+    </div>
+    <button class="btn" onclick="closeModal()">Cancelar</button>
+    <button class="btn primary" onclick="saveEditPregao('${id}',this)">Salvar</button>
+  </div>`);
+}
+async function saveEditPregao(id, btn) {
+  btn.disabled = true;
+  const { error } = await SB.from('pregoes').update(pregaoFromForm()).eq('id',id);
+  btn.disabled = false;
+  if (error) return alert('Erro: '+error.message);
+  closeModal(); renderTab();
+}
+async function archivePregao(id) {
+  if (!confirm('Arquivar este pregão? Ele ficará oculto mas os dados serão mantidos.')) return;
+  await SB.from('pregoes').update({fase:'arquivado'}).eq('id',id);
+  closeModal(); renderTab();
+}
+async function deletePregao(id) {
+  if (!confirm('EXCLUIR permanentemente? Esta ação não pode ser desfeita.')) return;
+  await SB.from('pregoes').delete().eq('id',id);
+  closeModal(); renderTab();
+}
+
+// ── ENCERRAR ──
+function openEncerrar(id) {
+  showModal(`<h2>Encerrar pregão</h2>
+  <p style="font-size:13px;color:var(--text2);margin-bottom:14px">O pregão irá para Resultados. Você adicionará os itens ganhos e perdidos a seguir.</p>
+  <div class="field"><label>Validade da ata / contrato</label><input type="date" id="f-validade"></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal()">Cancelar</button>
+    <button class="btn primary" onclick="confirmarEncerrar('${id}',this)">Encerrar e registrar itens</button>
+  </div>`);
+}
+async function confirmarEncerrar(id, btn) {
+  btn.disabled = true;
+  await SB.from('pregoes').update({encerrado:true, validade_ata:val('f-validade')||null}).eq('id',id);
+  btn.disabled = false;
+  closeModal();
+  await openItens(id);
+}
+
+// ── ITENS ──
+async function openItens(id) {
+  const { data: p } = await SB.from('pregoes').select('*').eq('id',id).single();
+  const { data: itens } = await SB.from('itens').select('*').eq('pregao_id',id);
+  _editingItens = JSON.parse(JSON.stringify(itens||[]));
+  _itensP = p;
+  renderItensModal(id);
+}
+
+function renderItensModal(id) {
+  const p = _itensP;
+  const itHtml = _editingItens.length ? _editingItens.map((it,idx) => {
+    let extra = '';
+    if (it.resultado === 'ganho') {
+      extra = `<div class="row" style="margin-top:8px">
+        <div class="field"><label>Qtd ganha</label><input type="number" value="${it.qtd_ganha||''}" onchange="_editingItens[${idx}].qtd_ganha=Number(this.value)"></div>
+        <div class="field"><label>Valor unitário (R$)</label><input type="number" step="0.01" value="${it.valor_unit||''}" onchange="_editingItens[${idx}].valor_unit=Number(this.value)"></div>
+      </div>`;
+    } else if (it.resultado === 'perdido') {
+      extra = `<div class="row" style="margin-top:8px">
+        <div class="field"><label>Empresa vencedora</label><input value="${esc(it.empresa_venc||'')}" onchange="_editingItens[${idx}].empresa_venc=this.value"></div>
+        <div class="field"><label>Quantidade</label><input type="number" value="${it.qtd_venc||''}" onchange="_editingItens[${idx}].qtd_venc=Number(this.value)"></div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <div class="field"><label>Valor vencedor (R$)</label><input type="number" step="0.01" value="${it.valor_venc||''}" onchange="_editingItens[${idx}].valor_venc=Number(this.value)"></div>
+        <div class="field"><label>Valor mínimo (R$)</label><input type="number" step="0.01" value="${it.valor_min||''}" onchange="_editingItens[${idx}].valor_min=Number(this.value)"></div>
+        <div class="field"><label>Motivo da perda</label><select onchange="_editingItens[${idx}].motivo_perda=this.value">
+          <option value="">— selecione —</option>
+          ${MOTIVOS_PERDA.map(m=>`<option${it.motivo_perda===m?' selected':''}>${m}</option>`).join('')}
+        </select></div>
+      </div>`;
+    }
+    return `<div class="item-block">
     <div class="row">
-      <div class="field"><label>Nº RP</label><input id="rp-num" placeholder="RP-2025-001"></div>
-      <div class="field"><label>RP Repasse</label><input id="rp-rep" placeholder="se houver"></div>
+      <div class="field"><label>Produto</label><input value="${esc(it.produto||'')}" onchange="_editingItens[${idx}].produto=this.value"></div>
+      <div class="field" style="flex:0 0 150px"><label>Resultado</label>
+        <select onchange="_editingItens[${idx}].resultado=this.value;renderItensModal('${id}')">
+          <option value=""${!it.resultado?' selected':''}>— selecione —</option>
+          <option value="ganho"${it.resultado==='ganho'?' selected':''}>Ganho</option>
+          <option value="perdido"${it.resultado==='perdido'?' selected':''}>Perdido</option>
+        </select>
+      </div>
+      <button class="btn sm danger" style="margin-top:20px" onclick="_editingItens.splice(${idx},1);renderItensModal('${id}')">🗑</button>
+    </div>${extra}</div>`;
+  }).join('') : `<div class="empty" style="padding:16px">Nenhum item adicionado</div>`;
+
+  showModal(`<h2>Itens — ${esc(p?.pregao||'s/nº')}${p?.cliente?` | ${esc(p.cliente)}`:''}</h2>
+  <div class="row" style="margin-bottom:14px">
+    <div class="field"><label>Validade ata/contrato</label><input type="date" id="f-validade" value="${p?.validade_ata||''}"></div>
+    <div class="field"><label>Prazo de entrega</label><input id="f-prazo-it" value="${esc(p?.prazo_entrega||'')}" placeholder="Ex: 30 dias corridos"></div>
+  </div>
+  <div id="itens-list">${itHtml}</div>
+  <button class="btn" style="margin-top:8px" onclick="adicionarItem('${id}')">+ Adicionar item</button>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal()">Cancelar</button>
+    <button class="btn primary" onclick="saveItens('${id}',this)">Salvar itens</button>
+  </div>`);
+}
+
+function adicionarItem(id) {
+  const vl = val('f-validade'), pr = val('f-prazo-it');
+  _itensP = {..._itensP, validade_ata: vl, prazo_entrega: pr};
+  _editingItens.push({produto:'', resultado:''});
+  renderItensModal(id);
+  setTimeout(()=>{ if(g('f-validade')) g('f-validade').value=vl; if(g('f-prazo-it')) g('f-prazo-it').value=pr; },0);
+}
+
+function renderItensModalReload(id) {
+  const vl = val('f-validade'), pr = val('f-prazo-it');
+  _itensP = {..._itensP, validade_ata: vl, prazo_entrega: pr};
+  renderItensModal(id);
+  setTimeout(()=>{ if(g('f-validade')) g('f-validade').value=vl; if(g('f-prazo-it')) g('f-prazo-it').value=pr; },0);
+}
+
+async function saveItens(id, btn) {
+  btn.disabled = true;
+  await SB.from('pregoes').update({
+    validade_ata: val('f-validade')||null,
+    prazo_entrega: val('f-prazo-it')
+  }).eq('id',id);
+  await SB.from('itens').delete().eq('pregao_id',id);
+  const toInsert = _editingItens.filter(it=>it.produto).map(it=>({
+    pregao_id:id, produto:it.produto, resultado:it.resultado,
+    qtd_ganha:it.qtd_ganha||null, valor_unit:it.valor_unit||null,
+    empresa_venc:it.empresa_venc||null, qtd_venc:it.qtd_venc||null,
+    valor_venc:it.valor_venc||null, valor_min:it.valor_min||null,
+    motivo_perda:it.motivo_perda||null
+  }));
+  if (toInsert.length) await SB.from('itens').insert(toInsert);
+  btn.disabled = false;
+  closeModal(); renderTab();
+}
+
+// ── RP ──
+async function openRP(pid) {
+  const { data: p } = await SB.from('pregoes').select('*, itens(*)').eq('id',pid).single();
+  _avulsoItens = [{produto:'',qtd:0,valor_unit:0}];
+  _rpPregao = p;
+  renderRPModal(pid,'vinculado');
+}
+
+function renderRPModal(pid, modo) {
+  const p = _rpPregao; if(!p) return;
+  const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+  const isAv = modo==='avulso';
+
+  const origemBox = `<div class="info-box"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Pregão de origem</div>
+    <div class="ib-row">
+      <div class="ib-item"><div class="ib-label">Cliente original</div><div class="ib-value">${esc(p.cliente||'—')}</div></div>
+      <div class="ib-item"><div class="ib-label">UF</div><div class="ib-value">${p.uf||'—'}</div></div>
+      <div class="ib-item"><div class="ib-label">UASG</div><div class="ib-value">${esc(p.uasg||'—')}</div></div>
+      <div class="ib-item"><div class="ib-label">Licitante</div><div class="ib-value">${p.licitante||'—'}</div></div>
+      <div class="ib-item"><div class="ib-label">Prazo entrega</div><div class="ib-value">${esc(p.prazo_entrega||'—')}</div></div>
     </div>
-    <div class="sec">Itens do pedido</div>
-    ${itInputs}
-    ${isAv?`<button class="btn" style="margin-top:8px" onclick="avulsoItens.push({produto:'',qtd:0,valor_unit:0});App.renderRPModal('${pid}','avulso')">+ Adicionar item</button>`:''}
-    <div class="row" style="margin-top:12px;align-items:center">
-      <span style="font-size:13px;color:var(--text2)">Valor total:</span>
-      <span id="rp-total-display" class="total-display" style="margin-left:10px">R$ 0,00</span>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <div class="field"><label>Entrega</label><input type="date" id="rp-entrega"></div>
-      <div class="field"><label>Prorrogação</label><input type="date" id="rp-prorr"></div>
-    </div>
-    <div class="row" style="margin-top:8px"><div class="field"><label>Obs. Suprimentos</label><input id="rp-sup"></div></div>
-    <div class="row" style="margin-top:6px"><div class="field"><label>Obs. Licitação</label><input id="rp-lic"></div></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="App.closeModal()">Cancelar</button>
-      <button class="btn primary" onclick="App.saveRP('${pid}','${modo}')">Salvar RP</button>
-    </div>`);
+  </div>`;
+
+  const clienteAderente = isAv ? `<div class="divider-label">Cliente aderente</div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="field"><label>Cliente aderente</label><input id="rp-cli-ad" placeholder="Nome do cliente que está aderindo"></div>
+      <div class="field" style="flex:0 0 80px"><label>UF</label><select id="rp-uf-ad">${UF_OPTS.map(u=>`<option>${u}</option>`).join('')}</select></div>
+    </div>` : '';
+
+  const itInputs = isAv
+    ? _avulsoItens.map((it,idx)=>`<div class="item-block" style="margin-top:6px">
+        <div class="row">
+          <div class="field"><label>Produto</label><input value="${esc(it.produto||'')}" onchange="_avulsoItens[${idx}].produto=this.value"></div>
+          <div class="field" style="flex:0 0 80px"><label>Qtd</label><input type="number" min="0" value="${it.qtd||0}" oninput="_avulsoItens[${idx}].qtd=Number(this.value);recalcRP('${modo}')"></div>
+          <div class="field" style="flex:0 0 120px"><label>Valor unit. (R$)</label><input type="number" step="0.01" value="${it.valor_unit||0}" oninput="_avulsoItens[${idx}].valor_unit=Number(this.value);recalcRP('${modo}')"></div>
+          <button class="btn sm danger" style="margin-top:20px" onclick="_avulsoItens.splice(${idx},1);renderRPModal('${pid}','${modo}')">🗑</button>
+        </div>
+      </div>`).join('')
+    : ganhos.length
+      ? ganhos.map(it=>`<div class="row" style="margin-top:6px;align-items:center">
+          <span style="flex:1;font-size:13px">${esc(it.produto||'Produto')} <span style="color:var(--text2)">(R$ ${fmtMoney(it.valor_unit)}/un)</span></span>
+          <div class="field" style="flex:0 0 90px;margin:0"><label>Qtd</label><input type="number" id="rp-q-${it.id}" min="0" value="0" oninput="recalcRP('${modo}')"></div>
+        </div>`).join('')
+      : `<p style="font-size:13px;color:var(--text2)">Nenhum item ganho neste pregão</p>`;
+
+  showModal(`<h2>Novo RP — ${esc(p.pregao||'s/nº')}</h2>
+  <div class="toggle-row">
+    <div class="toggle-opt${!isAv?' active':''}" onclick="renderRPModal('${pid}','vinculado')">Vinculado ao saldo</div>
+    <div class="toggle-opt${isAv?' active':''}" onclick="renderRPModal('${pid}','avulso')">Adesão de ata</div>
+  </div>
+  ${origemBox}${clienteAderente}
+  <div class="row">
+    <div class="field"><label>Nº RP</label><input id="rp-num" placeholder="RP-2025-001"></div>
+    <div class="field"><label>RP Repasse</label><input id="rp-rep" placeholder="se houver"></div>
+  </div>
+  <div class="sec">Itens do pedido</div>
+  ${itInputs}
+  ${isAv?`<button class="btn" style="margin-top:8px" onclick="_avulsoItens.push({produto:'',qtd:0,valor_unit:0});renderRPModal('${pid}','avulso')">+ Adicionar item</button>`:''}
+  <div class="row" style="margin-top:12px;align-items:center">
+    <span style="font-size:13px;color:var(--text2)">Valor total:</span>
+    <span id="rp-total-display" class="total-display" style="margin-left:10px">R$ 0,00</span>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <div class="field"><label>Entrega</label><input type="date" id="rp-entrega"></div>
+    <div class="field"><label>Prorrogação</label><input type="date" id="rp-prorr"></div>
+  </div>
+  <div class="row" style="margin-top:8px"><div class="field"><label>Obs. Suprimentos</label><input id="rp-sup"></div></div>
+  <div class="row" style="margin-top:6px"><div class="field"><label>Obs. Licitação</label><input id="rp-lic"></div></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal()">Cancelar</button>
+    <button class="btn primary" onclick="saveRP('${pid}','${modo}',this)">Salvar RP</button>
+  </div>`);
+}
+
+function recalcRP(modo) {
+  const p = _rpPregao; if(!p) return;
+  let total = 0;
+  if (modo==='avulso') {
+    total = _avulsoItens.reduce((a,i)=>a+(Number(i.qtd)||0)*(Number(i.valor_unit)||0),0);
+  } else {
+    (p.itens||[]).filter(i=>i.resultado==='ganho').forEach(it=>{
+      total += (Number(g('rp-q-'+it.id)?.value)||0)*(Number(it.valor_unit)||0);
+    });
+  }
+  const d = g('rp-total-display'); if(d) d.textContent = 'R$ '+fmtMoney(total);
+}
+
+async function saveRP(pid, modo, btn) {
+  btn.disabled = true;
+  const p = _rpPregao;
+  const isAv = modo==='avulso';
+  const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+  let total = 0, pedidoItens = [];
+
+  if (isAv) {
+    pedidoItens = _avulsoItens.filter(i=>i.qtd>0).map(i=>({produto:i.produto,qtd:i.qtd,valor_unit:i.valor_unit,item_id:null}));
+    total = pedidoItens.reduce((a,i)=>a+(i.qtd*i.valor_unit),0);
+  } else {
+    ganhos.forEach(it=>{
+      const qtd = Number(g('rp-q-'+it.id)?.value||0);
+      if (qtd>0) { pedidoItens.push({item_id:it.id,produto:it.produto,qtd,valor_unit:it.valor_unit}); total+=qtd*(Number(it.valor_unit)||0); }
+    });
   }
 
-  function recalcRP(modo) {
-    const p = window._rpPregao; if(!p) return;
-    let total = 0;
-    if (modo==='avulso') {
-      total = avulsoItens.reduce((a,i)=>a+(Number(i.qtd)||0)*(Number(i.valor_unit)||0),0);
-    } else {
-      (p.itens||[]).filter(i=>i.resultado==='ganho').forEach(it=>{
-        total += (Number(g('rp-q-'+it.id)?.value)||0)*(Number(it.valor_unit)||0);
-      });
-    }
-    const d = g('rp-total-display'); if(d) d.textContent = 'R$ '+fmtMoney(total);
-  }
+  const { data: rp, error } = await SB.from('pedidos').insert({
+    pregao_id:pid, licitante:p.licitante, avulso:isAv,
+    numero:val('rp-num'), rp_repasse:val('rp-rep'),
+    cliente:p.cliente, uf:p.uf,
+    cliente_aderente:isAv?val('rp-cli-ad'):null,
+    uf_aderente:isAv?val('rp-uf-ad'):null,
+    valor_total:total, entrega:val('rp-entrega')||null,
+    prorrogacao:val('rp-prorr')||null,
+    obs_sup:val('rp-sup'), obs_lic:val('rp-lic')
+  }).select().single();
 
-  async function saveRP(pid, modo) {
-    const btn = event.target; btn.disabled = true;
-    const p = window._rpPregao;
-    const isAv = modo==='avulso';
-    const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+  if (error) { btn.disabled=false; return alert('Erro: '+error.message); }
+  if (pedidoItens.length) await SB.from('pedido_itens').insert(pedidoItens.map(i=>({...i,pedido_id:rp.id})));
+  btn.disabled=false; closeModal(); renderTab();
+}
 
-    let total = 0;
-    let pedidoItens = [];
-
-    if (isAv) {
-      pedidoItens = avulsoItens.filter(i=>i.qtd>0).map(i=>({produto:i.produto, qtd:i.qtd, valor_unit:i.valor_unit, item_id:null}));
-      total = pedidoItens.reduce((a,i)=>a+(i.qtd*i.valor_unit),0);
-    } else {
-      ganhos.forEach(it=>{
-        const qtd = Number(g('rp-q-'+it.id)?.value||0);
-        if (qtd>0) { pedidoItens.push({item_id:it.id, produto:it.produto, qtd, valor_unit:it.valor_unit}); total+=qtd*(Number(it.valor_unit)||0); }
-      });
-    }
-
-    const { data: rp, error } = await sb.from('pedidos').insert({
-      pregao_id: pid, licitante: p.licitante, avulso: isAv,
-      numero: val('rp-num'), rp_repasse: val('rp-rep'),
-      cliente: p.cliente, uf: p.uf,
-      cliente_aderente: isAv?val('rp-cli-ad'):null,
-      uf_aderente: isAv?val('rp-uf-ad'):null,
-      valor_total: total,
-      entrega: val('rp-entrega')||null,
-      prorrogacao: val('rp-prorr')||null,
-      obs_sup: val('rp-sup'), obs_lic: val('rp-lic')
-    }).select().single();
-
-    if (error) { btn.disabled=false; return alert('Erro: '+error.message); }
-    if (pedidoItens.length) {
-      await sb.from('pedido_itens').insert(pedidoItens.map(i=>({...i, pedido_id:rp.id})));
-    }
-    btn.disabled=false; closeModal(); renderTab();
-  }
-
-  async function deleteRP(id) {
-    if (!confirm('Remover este RP? O saldo dos itens será restaurado automaticamente.')) return;
-    await sb.from('pedidos').delete().eq('id',id);
-    renderTab();
-  }
-
-  function onBusca(tab, v) { buscas[tab] = v; renderTab(); }
-  function onFiltro(k, v) { filtros[k] = v; renderTab(); }
-
-  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-  // ── INIT ──
-  const sbUrl = localStorage.getItem('sb_url');
-  const sbKey = localStorage.getItem('sb_key');
-  if (sbUrl && sbKey) {
-    initSupabase(sbUrl, sbKey);
-  }
-
-  return { saveConfig, setCompany, switchTab, onBusca, onFiltro, openNewPregao, saveNewPregao, openEditPregao, saveEditPregao, archivePregao, deletePregao, openEncerrar, confirmarEncerrar, openItens, reRenderItens, saveItens, openRP, renderRPModal, recalcRP, saveRP, deleteRP, closeModal };
-})();
-
-var editingItens = [];
-var avulsoItens = [];
+async function deleteRP(id) {
+  if (!confirm('Remover este RP? O saldo será restaurado automaticamente.')) return;
+  await SB.from('pedidos').delete().eq('id',id);
+  renderTab();
+}
 </script>
 </body>
 </html>
