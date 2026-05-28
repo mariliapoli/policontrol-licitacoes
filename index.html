@@ -443,7 +443,7 @@ async function renderSaldo() {
       const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
       const rps = p.pedidos||[];
       return ganhos.some(it => {
-        const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
+        const comprado = (Number(it.qtd_comprada_hist)||0) + rps.filter(r=>!r.avulso).reduce((a,r)=>{
           const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
           return a+(ri?Number(ri.qtd||0):0);
         },0);
@@ -468,7 +468,7 @@ async function renderSaldo() {
     const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
     const rps = p.pedidos||[];
     ganhos.forEach(it => {
-      const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
+      const comprado = (Number(it.qtd_comprada_hist)||0) + rps.filter(r=>!r.avulso).reduce((a,r)=>{
         const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
         return a+(ri?Number(ri.qtd||0):0);
       },0);
@@ -510,7 +510,7 @@ async function renderSaldo() {
 
     let cardTotalGanho = 0, cardTotalSaldo = 0;
     const itensHtml = ganhos.map(it => {
-      const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
+      const comprado = (Number(it.qtd_comprada_hist)||0) + rps.filter(r=>!r.avulso).reduce((a,r)=>{
         const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
         return a+(ri?Number(ri.qtd||0):0);
       },0);
@@ -1043,7 +1043,7 @@ async function exportarSaldo() {
   lista.forEach(p => {
     const rps = p.pedidos||[];
     (p.itens||[]).filter(i=>i.resultado==='ganho').forEach(it => {
-      const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{ const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id); return a+(ri?Number(ri.qtd||0):0); },0);
+      const comprado = (Number(it.qtd_comprada_hist)||0) + rps.filter(r=>!r.avulso).reduce((a,r)=>{ const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id); return a+(ri?Number(ri.qtd||0):0); },0);
       const saldo = Math.max(0, Number(it.qtd_ganha||0)-comprado);
       rows.push([p.licitante,p.cliente,p.uf,p.pregao,p.uasg,p.validade_ata,p.prazo_entrega,it.produto,it.qtd_ganha,it.valor_unit,(it.qtd_ganha||0)*(it.valor_unit||0),comprado,saldo,saldo*(it.valor_unit||0)]);
     });
