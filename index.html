@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Policontrol — Licitações</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -85,7 +86,26 @@
   .divider-label { display:flex;align-items:center;gap:8px;margin:16px 0 10px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em; }
   .divider-label::before,.divider-label::after { content:'';flex:1;height:1px;background:var(--border); }
   .total-display { font-size:20px;font-weight:700;color:var(--green-fg); }
+  .totals-bar { display:flex;gap:16px;flex-wrap:wrap;background:var(--green-bg);border:1px solid #b8dda0;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;align-items:center; }
+  .totals-bar .tb-item { display:flex;flex-direction:column;gap:2px; }
+  .totals-bar .tb-label { font-size:10px;font-weight:700;color:var(--green-fg);text-transform:uppercase;letter-spacing:.05em; }
+  .totals-bar .tb-value { font-size:16px;font-weight:700;color:var(--green-fg); }
+  .card-totals { display:flex;gap:16px;flex-wrap:wrap;background:var(--surface2);border-radius:var(--radius);padding:8px 12px;margin-bottom:8px;font-size:12px; }
+  .card-totals .ct-item { display:flex;flex-direction:column;gap:1px; }
+  .card-totals .ct-label { font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em; }
+  .card-totals .ct-value { font-size:14px;font-weight:700;color:var(--text); }
   .alert-ata { background:#fff3cd;border:1px solid #ffc107;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#856404;margin-top:6px;display:flex;align-items:center;gap:6px; }
+  .badge-andamento { background:#1d9e75;color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:5px; }
+  .toggle-andamento { display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:12px;font-weight:600;color:var(--text2); }
+  .toggle-andamento input[type=checkbox] { width:16px;height:16px;accent-color:#1d9e75;cursor:pointer; }
+  /* Produto autocomplete */
+  .produto-wrap { position:relative; flex:1; min-width:110px; }
+  .produto-wrap input { width:100%; }
+  .produto-dropdown { position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);max-height:200px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.15); display:none; }
+  .produto-dropdown.open { display:block; }
+  .produto-opt { padding:7px 10px;font-size:13px;cursor:pointer; }
+  .produto-opt:hover, .produto-opt.focused { background:var(--surface2); }
+  .produto-opt mark { background:var(--amber-bg);color:var(--amber-fg);border-radius:2px;padding:0 1px; }
   #config-screen { position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:200; }
   .config-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:480px; }
   .config-card h2 { font-size:20px;font-weight:700;margin-bottom:8px; }
@@ -139,6 +159,9 @@ let companyFilter = '';
 let buscas = {pesquisa:'',resultado:'',saldo:'',pedidos:''};
 let filtros = {uf:''};
 let mostrarArquivados = false;
+let filtroMesSaldo = '';
+let filtroMesPedidos = '';
+let ocultarSaldoZerado = false;
 let _editingItens = [];
 let _avulsoItens = [];
 let _rpPregao = null;
@@ -150,6 +173,7 @@ const STATUS_OPTS = ['Aguardando retorno PH/Mário','Atenção!','Buscar novo ed
 const FIN_OPTS = ['—','OK','SERASA','SANDRA'];
 const UF_OPTS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 const MOTIVOS_PERDA = ['Preço','Desclassificados','Tempo aleatório','Erro operacional','Fracassado','Lance fechado','Outros'];
+const PRODUTOS = ['AP 2000 iR','AP 2000 iR 9V','AP 2000 iR Retroiluminado','AP 2000 iR Retroiluminado 9V','AP 2000 WT','AP 2000 WT 9V','AP 2000 WT Retroiluminado','AP 2000 WT Retroiluminado 9V','AQ Cloro','AQ Cloro 9V','AQ Cloro e pH','AQ Cloro e pH 9V','AQ Cloro e pH Retroiluminado','AQ Cloro e pH Retroiluminado 9V','AQ Cloro Retroiluminado','AQ Cloro Retroiluminado 9V','AQ Cor','AQ Cor 9V','AQ Cor Retroiluminado','AQ Cor Retroiluminado 9V','AQ Cor SO','AQ Flúor','AQ Flúor 9V','AQ Flúor Retroiluminado','AQ Flúor Retroiluminado 9V','AquaPRO','pHmetro SABESP','Bloco Digestor','Cartela Comparadora','Cartela cx 100','Cartela cx 10','Cartela Estéril cx 100','Cartela Estéril UN','Cartela UN','CARTRIDGE DSNET','CL-L1','CL-L2','CL-S1','CL-S2','CL-S4','CL Track','ColiControl Cx 10','ColiControl Cx 100','ColiControl Cx 200','ColiControl Cx 20','ColiControl PA','ColiControl MPN','ColiControl 100 – UN','ColiControl 250 – UN','Color Multi','Color Multi 9V','Color Multi Retroiluminado','Color Multi Retroiluminado 9V','Comparador ColiControl','Conjunto de Cubetas Padrão AP 2000','Conjunto de Cubetas Padrão AQ Cor','Conjunto Stabgel','Consumíveis TOC','Cor 450','Cubeta AP 2000','Cubeta AP 2000 cx 6','Cubeta AQ cor','Cubeta AQ cor cx 6','Cubeta AQ flúor/ cloro','Cubeta AQ Flúor/ cloro cx 6','Cubeta NQ','Cubeta padrão 0,02 NTU','Cubeta padrão 0,10 NTU','Cubeta padrão 10 NTU','Cubeta padrão 100 NTU','Cubeta padrão 1000 NTU','Cubeta padrão 20 NTU','Cubeta padrão 800 NTU','Cubeta padrão 0 UC','Cubeta padrão 10 UC','Cubeta padrão 100 UC','Cubeta padrão 500 UC','Cubeta Visodisc','DSNet OD','DSNet pH','DSNet SST','Eletrodo','Floc Correia Dentada','Floc III 3 provas','Floc III 6 provas','Floc III 6 provas retroiluminado','Floc IV 3 provas','Floc IV 6 provas','Flot 3 provas','Flot 6 provas','Fonte e Cabo','MEDIDOR DE OD','MOLDLAB - Frasco cx 100','MOLDLAB - Frasco un','Garrafa DBO','Garrafa DBO cx 6','KCl 3M 500 mL','KCl 3M 1000 mL','Kit ColorCheck Cloro','Kit ColorCheck Flúor','Kit Visodisc Cloro','Kit Visodisc Cloro e pH','MICROTOL','MPN Reader','NQ 200','OXITOP','Padrão de Cloro','Padrão de Flúor','Pastilha DPD 1','Pastilha DPD 1 – cx 10','Pastilha DPD 1 – cx 100','Pastilha DPD 1 – cx 1000','Pastilha DPD 4 – cx 100','Pastilha DPD 4 – cx 1000','PH 250','Pó DPD para CL17','PROMINENT - DACB Flúor','Reag. CL-X','Reag. DPD 600 testes','Reag. DQO 0,7 a 40 – 150 un','Reag. DQO 0,7 a 40 – 25 un','Reag. DQO 0,7 a 40 – un','Reag. DQO 20 a 1500 – 150 un','Reag. DQO 20 a 1500 – 25 un','Reag. DQO 20 a 1500 – un','Reag. DQO 200 A 15000 – 150 un','Reag. DQO 200 A 15000 – 25 un','Reag. DQO 200 A 15000 – un','Reag. DQO 25 A 1500 – 150 un','Reag. DQO 25 A 1500 – 25 un','Reag. DQO 25 A 1500 – un','Reag. DQO 3 A 150 – 150 un','Reag. DQO 3 A 150 – 25 un','Reag. DQO 3 a 150 – un','Reag. DQO 4 a 40 - un','Reag. DQO 4 a 40 – 150 un','Reag. DQO 4 a 40 – 25 un','Reagente DPD CL 17','Reagente FAS','Reagente POCKET FERRO','Reagente SMART CLORO 100 testes','Reagente SMART DQO','Reagente SMART FERRO','Reagente SMART MANGANÊS','Reagente SMART PH SVF','Reagente Viso PH SVF','Reagente VISODISC FERRO','Reagentes COPASA','Sachê DPD Livre – 10 mL – 100 un','Sachê DPD Livre – 10 mL – 500 un','Sachê DPD Livre – 10 mL – un','Sachê DPD Livre – 10 mL –1000 un','Sachê DPD Livre – 25 mL – 100 un','Sachê DPD Livre – 5 mL – 100 un','Sachê DPD Livre – 5 mL – un','Sachê DPD Livre – 5 mL –1000 un','Sachê DPD Livre e Total – 150 testes','Sachê DPD Total – 10 mL – 100 un','Sachê DPD Total – 10 mL – un','Sachê DPD Total – 10 mL –1000 un','Sachê DPD Total – 5 mL – 100 un','Sachê DPD Total – 5 mL – un','Sachê DPD Total – 5 mL –1000 un','Sachê Ferro 100 un','Sachê Ferro un','Seladora','Sensor de OD','Smart 3','Sol. Indicadora para CL17','Sol. Tampão para CL17','Solução Tampão Ph 6,2','SPADNS 100 TESTES','Spadns 1000 mL','Spadns 500 mL','Spadns Isento de Arsenito 1L','Spadns Isento de Arsenito 500 ML','Tampão pH 4','Tampão pH 7','Tampão pH 8,5','TISSAB LINHA 473ml','TISSAB III COM CDTA 1000 ml','TISSAB III COM CDTA ML','TOC','Turbtrack','VIAL TRUE – CX 100','TAMPA VIAL TRUE – CX 100','Vial TOC cx 72 un (HMI 90606)','CALIBRAÇÃO AQ COR','CALIBRAÇÃO AQ CLORO','CALIBRAÇÃO AQ FLUOR','CALIBRAÇÃO AP 2000','WTW - FRASCO OXITOP DE VOLUME ESPECÍFICO','WTW - 3620 IDS','WTW - OXITOP PT','WTW - OXITOP 12','WTW - BORRACHA OXITOP','WTW - CAP SENSOR','WTW - PASTILHA DBO','WTW - TURB PLUS 2020','WTW - PHOTOFLEX TURB','WTW – MEDIDOR MULTIPARÂMETROS'];
 
 // ── Init ──
 function saveConfig() {
@@ -320,7 +344,10 @@ async function renderResultado() {
   const busca = buscas.resultado.toLowerCase();
   const lista = (data||[]).filter(p => !busca || JSON.stringify(p).toLowerCase().includes(busca));
 
-  let html = `<div class="toolbar"><input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.resultado)}" oninput="onBusca('resultado',this.value)"></div>`;
+  let html = `<div class="toolbar">
+    <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.resultado)}" oninput="onBusca('resultado',this.value)">
+    <button class="btn ghost" onclick="exportarResultados()" style="font-size:12px">📥 Exportar</button>
+  </div>`;
   if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">🏆 Nenhum pregão encerrado</div>`; return; }
 
   lista.forEach(p => {
@@ -334,6 +361,7 @@ async function renderResultado() {
         ${ganhos.length?`<span class="badge b-green">${ganhos.length} ganho(s)</span>`:''}
         ${perdidos.length?`<span class="badge b-red">${perdidos.length} perdido(s)</span>`:''}
         <button class="btn sm" onclick="openItens('${p.id}')">📋 Itens</button>
+        <button class="btn sm danger" onclick="deletePregao('${p.id}')">🗑</button>
       </div>
     </div>
     <div class="card-meta">
@@ -358,15 +386,79 @@ async function renderResultado() {
 }
 
 // ── SALDO ──
+function mesOpts(selected) {
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const now = new Date();
+  let opts = `<option value="">Todos os meses</option>`;
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const v = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${meses[d.getMonth()]} ${d.getFullYear()}`;
+    opts += `<option value="${v}"${selected===v?' selected':''}>${label}</option>`;
+  }
+  return opts;
+}
+
 async function renderSaldo() {
   let q = SB.from('pregoes').select('*, itens(*), pedidos(*, pedido_itens(*))').eq('encerrado',true).neq('fase','arquivado').order('created_at',{ascending:false});
   if (companyFilter) q = q.eq('licitante', companyFilter);
   const { data } = await q;
   const busca = buscas.saldo.toLowerCase();
-  const lista = (data||[]).filter(p => (p.itens||[]).some(i=>i.resultado==='ganho') && (!busca || JSON.stringify(p).toLowerCase().includes(busca)));
 
-  let html = `<div class="toolbar"><input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.saldo)}" oninput="onBusca('saldo',this.value)"></div>`;
-  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">📦 Nenhum contrato ativo</div>`; return; }
+  let lista = (data||[]).filter(p => (p.itens||[]).some(i=>i.resultado==='ganho') && (!busca || JSON.stringify(p).toLowerCase().includes(busca)));
+
+  // filter by month (based on data do pregão)
+  if (filtroMesSaldo) {
+    lista = lista.filter(p => p.data && p.data.startsWith(filtroMesSaldo));
+  }
+
+  // Ocultar contratos onde todos os itens ganhos têm saldo zerado
+  if (ocultarSaldoZerado) {
+    lista = lista.filter(p => {
+      const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+      const rps = p.pedidos||[];
+      return ganhos.some(it => {
+        const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
+          const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
+          return a+(ri?Number(ri.qtd||0):0);
+        },0);
+        return Math.max(0, Number(it.qtd_ganha||0)-comprado) > 0;
+      });
+    });
+  }
+
+  // totals
+  let totalGanho = 0, totalSaldo = 0;
+  lista.forEach(p => {
+    const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
+    const rps = p.pedidos||[];
+    ganhos.forEach(it => {
+      const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
+        const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
+        return a+(ri?Number(ri.qtd||0):0);
+      },0);
+      const saldo = Math.max(0, Number(it.qtd_ganha||0)-comprado);
+      totalGanho += Number(it.qtd_ganha||0) * Number(it.valor_unit||0);
+      totalSaldo += saldo * Number(it.valor_unit||0);
+    });
+  });
+
+  let html = `<div class="toolbar">
+    <input type="text" placeholder="Buscar pregão, UASG, cliente..." value="${esc(buscas.saldo)}" oninput="onBusca('saldo',this.value)">
+    <select onchange="filtroMesSaldo=this.value;renderTab()">${mesOpts(filtroMesSaldo)}</select>
+    <button class="btn ghost" onclick="ocultarSaldoZerado=!ocultarSaldoZerado;renderTab()" style="font-size:12px">${ocultarSaldoZerado?'👁 Mostrar saldo zerado':'🚫 Ocultar saldo zerado'}</button>
+    <button class="btn ghost" onclick="exportarSaldo()" style="font-size:12px">📥 Exportar</button>
+  </div>`;
+
+  if (lista.length) {
+    html += `<div class="totals-bar">
+      <div class="tb-item"><div class="tb-label">Total ganho${filtroMesSaldo?' (mês)':''}</div><div class="tb-value">R$ ${fmtMoney(totalGanho)}</div></div>
+      <div class="tb-item"><div class="tb-label">Valor saldo atual${filtroMesSaldo?' (mês)':''}</div><div class="tb-value">R$ ${fmtMoney(totalSaldo)}</div></div>
+      <div class="tb-item"><div class="tb-label">Contratos</div><div class="tb-value">${lista.length}</div></div>
+    </div>`;
+  }
+
+  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">📦 Nenhum contrato encontrado</div>`; return; }
 
   lista.forEach(p => {
     const ganhos = (p.itens||[]).filter(i=>i.resultado==='ganho');
@@ -375,6 +467,7 @@ async function renderSaldo() {
     const ataAlert = p.validade_ata && dias !== null && dias < 60
       ? `<div class="alert-ata">⚠️ ${dias <= 0 ? 'Ata VENCIDA!' : `Ata vence em ${dias} dia(s) — ${p.validade_ata}`}</div>` : '';
 
+    let cardTotalGanho = 0, cardTotalSaldo = 0;
     const itensHtml = ganhos.map(it => {
       const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{
         const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id);
@@ -382,6 +475,8 @@ async function renderSaldo() {
       },0);
       const saldo = Math.max(0, Number(it.qtd_ganha||0)-comprado);
       const pct = Number(it.qtd_ganha)>0?Math.max(0,Math.round(saldo/Number(it.qtd_ganha)*100)):0;
+      cardTotalGanho += Number(it.qtd_ganha||0) * Number(it.valor_unit||0);
+      cardTotalSaldo += saldo * Number(it.valor_unit||0);
       return `<div class="item-row"><div style="flex:1">
         <div style="font-size:13px;font-weight:600">${esc(it.produto||'Produto')}</div>
         <div style="font-size:11px;color:var(--text2)">Ganho: ${it.qtd_ganha||0} | Comprado: ${comprado} | <strong>Saldo: ${saldo}</strong> | R$ ${fmtMoney(it.valor_unit)}/un | Valor saldo: R$ ${fmtMoney(saldo*(it.valor_unit||0))}</div>
@@ -400,12 +495,15 @@ async function renderSaldo() {
         <button class="btn sm danger" onclick="deleteRP('${rp.id}')">🗑</button>
       </div>`).join('')}` : '';
 
-    html += `<div class="card">
+    html += `<div class="card" style="${p.em_andamento?'border-color:#1d9e75;border-width:2px':''}">
     <div class="card-header">
       <div class="card-title">${esc(p.pregao||'s/nº')} — ${esc(p.uasg||'?')}${p.cliente?` | ${esc(p.cliente)}`:''}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${p.em_andamento?`<span class="badge-andamento">🟢 Em andamento</span>`:''}
         ${litBadge(p.licitante)}
+        <label class="toggle-andamento"><input type="checkbox" ${p.em_andamento?'checked':''} onchange="toggleAndamento('${p.id}',this.checked)"> Em andamento</label>
         <button class="btn sm primary" onclick="openRP('${p.id}')">+ RP</button>
+        <button class="btn sm danger" onclick="deletePregao('${p.id}')">🗑</button>
       </div>
     </div>
     <div class="card-meta">
@@ -414,6 +512,10 @@ async function renderSaldo() {
       ${p.validade_ata
         ?`<span style="color:${dias!==null&&dias<60?'var(--red-fg)':'inherit'}">📆 Ata: <strong>${p.validade_ata}</strong>${dias!==null&&dias<60?' ⚠️':''}</span>`
         :`<span style="color:var(--red-fg)">⚠️ Validade não informada</span>`}
+    </div>
+    <div class="card-totals">
+      <div class="ct-item"><div class="ct-label">Total ganho</div><div class="ct-value">R$ ${fmtMoney(cardTotalGanho)}</div></div>
+      <div class="ct-item"><div class="ct-label">Valor saldo</div><div class="ct-value" style="color:${cardTotalSaldo>0?'var(--green-fg)':'var(--text3)'}">R$ ${fmtMoney(cardTotalSaldo)}</div></div>
     </div>
     ${ataAlert}${itensHtml}${rpsHtml}
     </div>`;
@@ -427,10 +529,29 @@ async function renderPedidos() {
   if (companyFilter) q = q.eq('licitante', companyFilter);
   const { data } = await q;
   const busca = buscas.pedidos.toLowerCase();
-  const lista = (data||[]).filter(r => !busca || JSON.stringify(r).toLowerCase().includes(busca));
 
-  let html = `<div class="toolbar"><input type="text" placeholder="Buscar RP, cliente, pregão..." value="${esc(buscas.pedidos)}" oninput="onBusca('pedidos',this.value)"></div>`;
-  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">🛒 Nenhum pedido registrado</div>`; return; }
+  let lista = (data||[]).filter(r => !busca || JSON.stringify(r).toLowerCase().includes(busca));
+
+  if (filtroMesPedidos) {
+    lista = lista.filter(r => r.data_reg && r.data_reg.startsWith(filtroMesPedidos));
+  }
+
+  const totalPedidos = lista.reduce((a,r) => a + Number(r.valor_total||0), 0);
+
+  let html = `<div class="toolbar">
+    <input type="text" placeholder="Buscar RP, cliente, pregão..." value="${esc(buscas.pedidos)}" oninput="onBusca('pedidos',this.value)">
+    <select onchange="filtroMesPedidos=this.value;renderTab()">${mesOpts(filtroMesPedidos)}</select>
+    <button class="btn ghost" onclick="exportarPedidos()" style="font-size:12px">📥 Exportar</button>
+  </div>`;
+
+  if (lista.length) {
+    html += `<div class="totals-bar">
+      <div class="tb-item"><div class="tb-label">Total pedidos${filtroMesPedidos?' (mês)':''}</div><div class="tb-value">R$ ${fmtMoney(totalPedidos)}</div></div>
+      <div class="tb-item"><div class="tb-label">Qtd RPs</div><div class="tb-value">${lista.length}</div></div>
+    </div>`;
+  }
+
+  if (!lista.length) { g('tab-content').innerHTML = html + `<div class="empty">🛒 Nenhum pedido encontrado</div>`; return; }
 
   lista.forEach(rp => {
     const p = rp.pregao||{};
@@ -448,7 +569,7 @@ async function renderPedidos() {
       <span>📍 ${esc(rp.avulso?(rp.uf_aderente||rp.uf||'—'):(rp.uf||p.uf||'—'))}</span>
       <span>Pregão: ${esc(p.pregao||'—')}</span>
       ${rp.avulso&&p.cliente?`<span style="color:var(--text2)">Ata original: ${esc(p.cliente)}</span>`:''}
-      <span>R$ ${fmtMoney(rp.valor_total)}</span>
+      <span style="font-weight:600">R$ ${fmtMoney(rp.valor_total)}</span>
       ${rp.entrega?`<span>Entrega: ${rp.entrega}</span>`:''}
       ${rp.prorrogacao?`<span>Prorrogação: ${rp.prorrogacao}</span>`:''}
     </div>
@@ -603,7 +724,12 @@ function renderItensModal(id) {
     }
     return `<div class="item-block">
     <div class="row">
-      <div class="field"><label>Produto</label><input value="${esc(it.produto||'')}" onchange="_editingItens[${idx}].produto=this.value"></div>
+      <div class="field" style="flex:1;min-width:150px"><label>Produto</label>
+        <div class="produto-wrap">
+          <input id="pq-${idx}" value="${esc(it.produto||'')}" autocomplete="off" placeholder="Digite qualquer parte..." oninput="filtrarProdutos(${idx},this.value)" onkeydown="navProdutos(event,${idx})" onfocus="filtrarProdutos(${idx},this.value)" onblur="setTimeout(()=>fecharProdutos(${idx}),200)">
+          <div id="pd-${idx}" class="produto-dropdown"></div>
+        </div>
+      </div>
       <div class="field" style="flex:0 0 150px"><label>Resultado</label>
         <select onchange="_editingItens[${idx}].resultado=this.value;renderItensModal('${id}')">
           <option value=""${!it.resultado?' selected':''}>— selecione —</option>
@@ -786,6 +912,116 @@ async function deleteRP(id) {
   if (!confirm('Remover este RP? O saldo será restaurado automaticamente.')) return;
   await SB.from('pedidos').delete().eq('id',id);
   renderTab();
+}
+
+async function toggleAndamento(id, checked) {
+  await SB.from('pregoes').update({em_andamento: checked}).eq('id', id);
+  // no full re-render needed, just update local state quietly
+}
+
+// ── Produto search (any-position match) ──
+function filtrarProdutos(idx, q) {
+  const drop = document.getElementById('pd-'+idx);
+  if (!drop) return;
+  const busca = q.toLowerCase().trim();
+  const matches = busca.length < 1 ? PRODUTOS.slice(0,30) : PRODUTOS.filter(p => p.toLowerCase().includes(busca)).slice(0,40);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map((p,i) => {
+    const hi = busca ? p.replace(new RegExp('('+busca.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi'), '<mark>$1</mark>') : esc(p);
+    return `<div class="produto-opt" data-val="${esc(p)}" data-i="${i}" onmousedown="selecionarProduto(${idx},'${esc(p)}')">${hi}</div>`;
+  }).join('');
+  drop.classList.add('open');
+}
+function selecionarProduto(idx, val) {
+  _editingItens[idx].produto = val;
+  const inp = document.getElementById('pq-'+idx);
+  if (inp) inp.value = val;
+  fecharProdutos(idx);
+}
+function fecharProdutos(idx) {
+  const drop = document.getElementById('pd-'+idx);
+  if (drop) drop.classList.remove('open');
+}
+function navProdutos(e, idx) {
+  const drop = document.getElementById('pd-'+idx);
+  if (!drop || !drop.classList.contains('open')) return;
+  const opts = drop.querySelectorAll('.produto-opt');
+  const focused = drop.querySelector('.focused');
+  let fi = focused ? Number(focused.dataset.i) : -1;
+  if (e.key === 'ArrowDown') { fi = Math.min(fi+1, opts.length-1); }
+  else if (e.key === 'ArrowUp') { fi = Math.max(fi-1, 0); }
+  else if (e.key === 'Enter' && focused) { selecionarProduto(idx, focused.dataset.val); e.preventDefault(); return; }
+  else if (e.key === 'Escape') { fecharProdutos(idx); return; }
+  else return;
+  opts.forEach(o => o.classList.remove('focused'));
+  if (opts[fi]) { opts[fi].classList.add('focused'); opts[fi].scrollIntoView({block:'nearest'}); }
+  e.preventDefault();
+}
+
+// ── Exports ──
+function xlsxDownload(rows, filename) {
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+  XLSX.writeFile(wb, filename);
+}
+
+async function exportarResultados() {
+  let q = SB.from('pregoes').select('*, itens(*)').eq('encerrado',true).neq('fase','arquivado').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data } = await q;
+  const busca = buscas.resultado.toLowerCase();
+  const lista = (data||[]).filter(p => !busca || JSON.stringify(p).toLowerCase().includes(busca));
+  const rows = [['Licitante','Cliente','UF','Pregão','UASG','Data','Prazo Entrega','Validade Ata','Produto','Resultado','Qtd Ganha','Valor Unit','Valor Total','Empresa Vencedora','Qtd Vencedor','Valor Vencedor','Valor Mínimo','Motivo Perda']];
+  lista.forEach(p => {
+    (p.itens||[]).forEach(it => {
+      rows.push([p.licitante,p.cliente,p.uf,p.pregao,p.uasg,p.data,p.prazo_entrega,p.validade_ata,it.produto,it.resultado,it.qtd_ganha,it.valor_unit,(it.qtd_ganha||0)*(it.valor_unit||0),it.empresa_venc,it.qtd_venc,it.valor_venc,it.valor_min,it.motivo_perda]);
+    });
+    if (!(p.itens||[]).length) rows.push([p.licitante,p.cliente,p.uf,p.pregao,p.uasg,p.data,p.prazo_entrega,p.validade_ata,'','','','','','','','','','']);
+  });
+  xlsxDownload(rows, 'resultados_licitacoes.xlsx');
+}
+
+async function exportarSaldo() {
+  let q = SB.from('pregoes').select('*, itens(*), pedidos(*, pedido_itens(*))').eq('encerrado',true).neq('fase','arquivado').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data } = await q;
+  const busca = buscas.saldo.toLowerCase();
+  let lista = (data||[]).filter(p => (p.itens||[]).some(i=>i.resultado==='ganho') && (!busca || JSON.stringify(p).toLowerCase().includes(busca)));
+  if (filtroMesSaldo) lista = lista.filter(p => p.data && p.data.startsWith(filtroMesSaldo));
+  const rows = [['Licitante','Cliente','UF','Pregão','UASG','Validade Ata','Prazo Entrega','Produto','Qtd Ganha','Valor Unit','Total Ganho','Qtd Comprada','Saldo','Valor Saldo']];
+  lista.forEach(p => {
+    const rps = p.pedidos||[];
+    (p.itens||[]).filter(i=>i.resultado==='ganho').forEach(it => {
+      const comprado = rps.filter(r=>!r.avulso).reduce((a,r)=>{ const ri=(r.pedido_itens||[]).find(x=>x.item_id===it.id); return a+(ri?Number(ri.qtd||0):0); },0);
+      const saldo = Math.max(0, Number(it.qtd_ganha||0)-comprado);
+      rows.push([p.licitante,p.cliente,p.uf,p.pregao,p.uasg,p.validade_ata,p.prazo_entrega,it.produto,it.qtd_ganha,it.valor_unit,(it.qtd_ganha||0)*(it.valor_unit||0),comprado,saldo,saldo*(it.valor_unit||0)]);
+    });
+  });
+  xlsxDownload(rows, 'saldo_contratos.xlsx');
+}
+
+async function exportarPedidos() {
+  let q = SB.from('pedidos').select('*, pregao:pregao_id(pregao,uasg,cliente,uf), pedido_itens(*)').order('created_at',{ascending:false});
+  if (companyFilter) q = q.eq('licitante', companyFilter);
+  const { data } = await q;
+  const busca = buscas.pedidos.toLowerCase();
+  let lista = (data||[]).filter(r => !busca || JSON.stringify(r).toLowerCase().includes(busca));
+  if (filtroMesPedidos) lista = lista.filter(r => r.data_reg && r.data_reg.startsWith(filtroMesPedidos));
+  const rows = [['Licitante','Nº RP','RP Repasse','Cliente','UF','Pregão','UASG','Adesão','Produto','Qtd','Valor Total','Entrega','Prorrogação','Obs Suprimentos','Obs Licitação','Data Registro']];
+  lista.forEach(rp => {
+    const p = rp.pregao||{};
+    const cliente = rp.avulso?(rp.cliente_aderente||rp.cliente||''):(rp.cliente||p.cliente||'');
+    const uf = rp.avulso?(rp.uf_aderente||rp.uf||''):(rp.uf||p.uf||'');
+    if ((rp.pedido_itens||[]).length) {
+      (rp.pedido_itens||[]).forEach(it => {
+        rows.push([rp.licitante,rp.numero,rp.rp_repasse,cliente,uf,p.pregao,p.uasg,rp.avulso?'Sim':'Não',it.produto,it.qtd,rp.valor_total,rp.entrega,rp.prorrogacao,rp.obs_sup,rp.obs_lic,rp.data_reg]);
+      });
+    } else {
+      rows.push([rp.licitante,rp.numero,rp.rp_repasse,cliente,uf,p.pregao,p.uasg,rp.avulso?'Sim':'Não','',0,rp.valor_total,rp.entrega,rp.prorrogacao,rp.obs_sup,rp.obs_lic,rp.data_reg]);
+    }
+  });
+  xlsxDownload(rows, 'pedidos_rps.xlsx');
 }
 </script>
 </body>
