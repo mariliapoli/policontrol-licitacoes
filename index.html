@@ -164,6 +164,7 @@ let mostrarArquivados = false;
 let filtroMesSaldo = '';
 let filtroMesPedidos = '';
 let ocultarSaldoZerado = false;
+let ocultarAtaVencida = false;
 let ordemData = {pesquisa:'desc', resultado:'desc', saldo:'desc', pedidos:'desc'};
 let _editingItens = [];
 let _avulsoItens = [];
@@ -452,12 +453,24 @@ async function renderSaldo() {
     });
   }
 
+  // Filtro ata vencida
+  if (ocultarAtaVencida) {
+    lista = lista.filter(p => {
+      if (!p.validade_ata) return true; // sem validade = não filtra
+      return new Date(p.validade_ata) >= new Date();
+    });
+  }
+
   // Filtro ganho/perdido
   if (filtroSaldoResultado) {
     lista = lista.filter(p => (p.itens||[]).some(i => i.resultado === filtroSaldoResultado));
   }
 
   lista.sort((a,b) => {
+    if (ordemAta) {
+      const da = a.validade_ata||'9999', db = b.validade_ata||'9999';
+      return da.localeCompare(db); // ascending by ata date (soonest first)
+    }
     const da = a.data||a.validade_ata||'', db = b.data||b.validade_ata||'';
     return ordemData.saldo === 'desc' ? db.localeCompare(da) : da.localeCompare(db);
   });
@@ -487,7 +500,9 @@ async function renderSaldo() {
       <button class="${filtroSaldoResultado==='perdido'?'active':''}" onclick="filtroSaldoResultado='perdido';renderTab()">❌ Perdidos</button>
     </div>
     <button class="btn ghost" onclick="ocultarSaldoZerado=!ocultarSaldoZerado;renderTab()" style="font-size:12px">${ocultarSaldoZerado?'👁 Mostrar saldo zerado':'🚫 Ocultar saldo zerado'}</button>
-    <button class="btn ghost" onclick="toggleOrdem('saldo')" style="font-size:12px">${ordemData.saldo==='desc'?'📅 Mais recente':'📅 Mais antigo'}</button>
+    <button class="btn ghost" onclick="ocultarAtaVencida=!ocultarAtaVencida;renderTab()" style="font-size:12px">${ocultarAtaVencida?'📅 Mostrar ata vencida':'📅 Ocultar ata vencida'}</button>
+    <button class="btn ghost" onclick="toggleOrdem('saldo')" style="font-size:12px">${ordemData.saldo==='desc'?'🔽 Mais recente':'🔼 Mais antigo'}</button>
+    <button class="btn ghost" onclick="toggleOrdemAta()" style="font-size:12px">📆 Ordenar por ata</button>
     <button class="btn ghost" onclick="exportarSaldo()" style="font-size:12px">📥 Exportar</button>
   </div>`;
 
@@ -961,6 +976,12 @@ async function deleteRP(id) {
 
 function toggleOrdem(tab) {
   ordemData[tab] = ordemData[tab] === 'desc' ? 'asc' : 'desc';
+  renderTab();
+}
+
+let ordemAta = false; // false = por data pregão, true = por validade ata
+function toggleOrdemAta() {
+  ordemAta = !ordemAta;
   renderTab();
 }
 
